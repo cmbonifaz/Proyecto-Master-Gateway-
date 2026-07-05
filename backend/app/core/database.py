@@ -9,13 +9,27 @@ from app.core.config import settings
 
 
 # ── Motor de Base de Datos (async) ─────────────────────────────────────────────
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,      # Muestra SQL en consola solo en modo DEBUG
-    pool_pre_ping=True,       # Verifica conexión antes de usar del pool
-    pool_size=10,
-    max_overflow=20,
-)
+# Detectamos el tipo de BD para configurar el engine correctamente.
+# SQLite (usado en CI/tests) no soporta pool_size ni max_overflow.
+# PostgreSQL/Supabase (producción) sí los soporta.
+_IS_SQLITE = settings.DATABASE_URL.startswith("sqlite")
+
+if _IS_SQLITE:
+    from sqlalchemy.pool import StaticPool
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=settings.DEBUG,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+else:
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=settings.DEBUG,      # Muestra SQL en consola solo en modo DEBUG
+        pool_pre_ping=True,       # Verifica conexión antes de usar del pool
+        pool_size=10,
+        max_overflow=20,
+    )
 
 # ── Fábrica de sesiones ────────────────────────────────────────────────────────
 AsyncSessionLocal = async_sessionmaker(

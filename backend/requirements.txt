@@ -15,6 +15,7 @@ psycopg2-binary>=2.9.0   # Driver sync (usado por Alembic CLI)
 # ── Seguridad / Autenticación ──────────────────────────────────────────────────
 python-jose[cryptography]>=3.3.0   # JWT encode/decode
 passlib[bcrypt]>=1.7.4             # Hash de contraseñas con bcrypt
+bcrypt<4.0.0                       # passlib no es compatible con bcrypt>=4.x
 python-multipart>=0.0.6            # Necesario para Form() en FastAPI
 
 # ── Sanitización ───────────────────────────────────────────────────────────────

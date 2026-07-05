@@ -15,10 +15,10 @@ router = APIRouter()
 
 @router.get("/", response_model=List[ModuleResponse], summary="Listar módulos activos")
 async def list_modules(
-    skip: int = 0, 
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+    skip: int = 0,
     limit: int = 100,
-    current_user: CurrentUser = Depends(),
-    db: AsyncSession = Depends(get_db)
 ):
     return await ModuleService.list_active(db, skip=skip, limit=limit)
 
@@ -26,7 +26,7 @@ async def list_modules(
 @router.get("/{module_id}", response_model=ModuleResponse, summary="Obtener módulo por ID")
 async def get_module(
     module_id: str,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     module = await ModuleService.get_by_id(db, module_id)
@@ -38,7 +38,7 @@ async def get_module(
 @router.post("/", response_model=ModuleResponse, status_code=status.HTTP_201_CREATED, summary="Crear un módulo")
 async def create_module(
     obj_in: ModuleCreate,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     creator_id = current_user["user"].id
@@ -49,7 +49,7 @@ async def create_module(
 async def update_module(
     module_id: str,
     obj_in: ModuleUpdate,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     module = await ModuleService.get_by_id(db, module_id)
@@ -63,7 +63,7 @@ async def update_module(
 @router.delete("/{module_id}", response_model=ModuleResponse, summary="Eliminar un módulo (Soft Delete)")
 async def delete_module(
     module_id: str,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     module = await ModuleService.get_by_id(db, module_id)

@@ -4,6 +4,7 @@ internals.py — Endpoint privado para que otros microservicios validen tokens (
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 from app.core.database import get_db
 from app.core.security import decode_token, verify_token_type
 from app.services.user_service import UserService
@@ -22,8 +23,6 @@ class TokenValidationResponse(BaseModel):
     user_id: Optional[str] = None
     role_id: Optional[str] = None
 
-
-from typing import Optional
 
 
 @router.post(
