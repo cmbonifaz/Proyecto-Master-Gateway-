@@ -1,0 +1,196 @@
+name: Pipeline CI/CD DevSecOps
+
+on:
+  # Se ejecuta en PRs hacia 'test' para validación y merge automático
+  pull_request:
+    branches:
+      - test
+    types: [opened, synchronize, reopened]
+
+# Declaración explícita de permisos necesarios para que GitHub CLI (gh) pueda operar sin usar actions de terceros
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  # ==============================================================================
+  # JOB 1: GATEKEEPER DE SEGURIDAD (Analizador con Modelo Random Forest)
+  # ==============================================================================
+  gatekeeper-security-check:
+    name: Análisis de Seguridad ML
+    runs-on: ubuntu-latest
+    env:
+      # Token necesario para autenticar la CLI de GitHub
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Notificar inicio de revisión de seguridad
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="⏳ INICIO DE REVISIÓN: Comenzando análisis estático de seguridad para el PR #${{ github.event.pull_request.number }}."
+
+      - name: Setup de Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias del modelo de ML
+        run: |
+          python -m pip install --upgrade pip
+          # IMPORTANTE: versión exacta de scikit-learn = la misma con la que se entrenó el modelo
+          # Cambiar este número si se re-entrena el modelo con una versión diferente
+          pip install "scikit-learn==1.8.0" "numpy>=1.24.0" "scipy>=1.11.0" joblib pandas
+
+      - name: Extraer cambios del Pull Request (diff)
+        # Extraemos el código modificado directamente con la CLI de GitHub para evitar descargar actions de terceros
+        run: |
+          gh pr diff ${{ github.event.pull_request.number }} > cambios.diff
+          echo "Se ha extraído el código modificado en el PR."
+
+      - name: Ejecutar Análisis de Seguridad (Inferencia)
+        # Asumimos que el script 'analizador_ci.py' leerá el diff, aplicará el modelo .joblib
+        # y si encuentra código vulnerable finalizará con exit 1.
+        run: |
+          python scripts/analizador_ci.py cambios.diff
+
+      # ── MANEJO DE FALLO (SE DETECTÓ CÓDIGO VULNERABLE) ──
+      - name: Acciones correctivas ante código VULNERABLE
+        if: failure()
+        run: |
+          echo "Ejecutando protocolo de bloqueo de Pull Request..."
+
+          # 1. Comentar en el PR informando el rechazo con probabilidad (leyendo el reporte generado por Python)
+          gh pr comment ${{ github.event.pull_request.number }} --body-file reporte_seguridad.txt
+
+          # 2. Aplicar etiqueta 'fixing-required' al PR (requerido por rúbrica)
+          gh label create "fixing-required" --color "e11d48" --description "Código vulnerable detectado — revisión obligatoria" || true
+          gh pr edit ${{ github.event.pull_request.number }} --add-label "fixing-required"
+
+          # 3. Cerrar el Pull Request de forma inmediata
+          gh pr close ${{ github.event.pull_request.number }}
+
+          # 4. Crear un Issue para revisión obligatoria del equipo
+          gh issue create --title "Vulnerabilidad detectada en PR #${{ github.event.pull_request.number }}" --body-file reporte_seguridad.txt
+
+          # 5. Enviar notificación urgente a Telegram vía cURL (sin actions de terceros)
+          MSG="🚨 ALERTA CRÍTICA: Se ha bloqueado el PR #${{ github.event.pull_request.number }} por inyección de código vulnerable."
+          if [ -f telegram_msg.txt ]; then
+            MSG=$(cat telegram_msg.txt)
+          fi
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="$MSG"
+
+      # ── MANEJO DE ÉXITO (EL CÓDIGO ES SEGURO) ──
+      - name: Notificar éxito de seguridad
+        if: success()
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="✅ REVISIÓN DE SEGURIDAD APROBADA: El código del PR #${{ github.event.pull_request.number }} es seguro."
+
+  # ==============================================================================
+  # JOB 2: MERGE AUTOMÁTICO Y PRUEBAS FUNCIONALES
+  # ==============================================================================
+  auto-merge-and-test:
+    name: Merge a Test y Pytest
+    needs: gatekeeper-security-check
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Setup de Python 3.10 para pruebas
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Instalar dependencias funcionales y pytest
+        run: |
+          python -m pip install --upgrade pip
+          # Instalamos los requerimientos desde la nueva carpeta backend
+          if [ -f backend/requirements.txt ]; then pip install -r backend/requirements.txt; fi
+
+      - name: Ejecutar pruebas unitarias (Pytest)
+        run: |
+          cd backend
+          pytest tests/
+
+      # ── MANEJO DE FALLO EN PRUEBAS ──
+      - name: Notificar fallo de pruebas a Telegram
+        if: failure()
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="❌ ERROR PYTEST: Las pruebas funcionales fallaron en el PR #${{ github.event.pull_request.number }} antes del merge."
+          # Asegurar que existe la etiqueta 'tests-failed' y agregarla al PR
+          gh label create "tests-failed" --color "d73a4a" --description "Pruebas funcionales fallidas" || true
+          gh pr edit ${{ github.event.pull_request.number }} --add-label "tests-failed"
+
+      # ── MANEJO DE ÉXITO EN PRUEBAS Y MERGE DIRECTO ──
+      - name: Notificar éxito de pruebas y realizar merge
+        if: success()
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="✅ PYTEST PASS: Las pruebas unitarias finalizaron correctamente para el PR #${{ github.event.pull_request.number }}."
+          
+          # Hacemos merge directo usando permisos de admin para saltar la política de la rama
+          gh pr merge ${{ github.event.pull_request.number }} --merge --admin
+          
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="🔄 MERGE REALIZADO: El PR #${{ github.event.pull_request.number }} ha sido fusionado en la rama 'test'."
+
+  # ==============================================================================
+  # JOB 3: DESPLIEGUE A PRODUCCIÓN
+  # ==============================================================================
+  deploy-production:
+    name: Promoción a Main y Despliegue en Render
+    needs: auto-merge-and-test
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout de la rama 'test'
+        uses: actions/checkout@v4
+        with:
+          ref: test
+
+      - name: Crear y fusionar Pull Request hacia 'main'
+        # Promocionamos el código probado desde 'test' hacia 'main'
+        run: |
+          # Intentar crear el PR; si ya existe, ignorar el error
+          gh pr create --base main --head test --title "Deploy to Production" --body "Automated merge from test" || true
+          # Obtener la URL del PR activo entre test y main
+          PR_URL=$(gh pr list --state open --base main --head test --json url --jq '.[0].url')
+          # Fusionar el PR
+          gh pr merge $PR_URL --merge --admin
+
+      - name: Disparar webhook de despliegue en Render
+        # Activamos el hook de despliegue de Render para reconstruir y desplegar el contenedor Docker
+        run: |
+          curl -s -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+
+      - name: Notificación final de Despliegue Exitoso
+        if: success()
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="🎉 DESPLIEGUE EXITOSO: El nuevo código seguro está en producción. Puedes verlo aquí: https://pipeline-seguro.onrender.com"
+
+      - name: Notificación de Despliegue Fallido
+        if: failure()
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="❌ ERROR DE DESPLIEGUE: Falló la promoción a main o el webhook de Render."

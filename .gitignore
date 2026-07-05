@@ -1,0 +1,18 @@
+*.csv
+*.zip
+CVEFixes.csv
+CVEFixes.csv.zip
+
+# Caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos Virtuales
+venv/
+env/
+.env
+
+# Archivos temporales del sistema
+.DS_Store
+Thumbs.db
