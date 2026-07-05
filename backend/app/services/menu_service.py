@@ -70,7 +70,7 @@ class MenuService:
         return db_obj
 
     # ── Árbol Jerárquico Recursivo (CTE) ───────────────────────────────────────
-    @classmethod
+    @staticmethod
     async def get_menu_tree_for_role(db: AsyncSession, role_id: str) -> List[MenuNode]:
         """
         Obtiene el árbol de menús completo asignado a un rol específico.

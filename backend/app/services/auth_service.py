@@ -53,7 +53,7 @@ class AuthService:
         roles = result.scalars().all()
         return [RoleOption(id=r.id, nombre=r.nombre, descripcion=r.descripcion) for r in roles]
 
-    @classmethod
+    @staticmethod
     async def login_step1(db: AsyncSession, obj_in: LoginRequest) -> Optional[TempTokenResponse]:
         """
         Ejecuta el Paso 1 de Login.
@@ -78,7 +78,7 @@ class AuthService:
         )
         return TempTokenResponse(temp_token=temp_token, roles=roles)
 
-    @classmethod
+    @staticmethod
     async def select_role_step2(
         db: AsyncSession, 
         temp_token: str, 
@@ -125,7 +125,7 @@ class AuthService:
             refresh_token=refresh_token
         )
 
-    @classmethod
+    @staticmethod
     async def refresh_access_token(
         db: AsyncSession, 
         refresh_token: str,
