@@ -18,7 +18,7 @@ router = APIRouter()
 async def list_users(
     skip: int = 0, 
     limit: int = 100,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     # Por defecto, cualquier rol autenticado puede listar (se puede restringir a ADMIN)
@@ -28,7 +28,7 @@ async def list_users(
 @router.get("/{user_id}", response_model=UserResponse, summary="Obtener usuario por ID")
 async def get_user(
     user_id: str,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     user = await UserService.get_by_id(db, user_id)
@@ -40,7 +40,7 @@ async def get_user(
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED, summary="Crear un usuario")
 async def create_user(
     obj_in: UserCreate,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     # Verificar si el email ya está en uso
@@ -56,7 +56,7 @@ async def create_user(
 async def update_user(
     user_id: str,
     obj_in: UserUpdate,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     user = await UserService.get_by_id(db, user_id)
@@ -70,7 +70,7 @@ async def update_user(
 @router.delete("/{user_id}", response_model=UserResponse, summary="Eliminar usuario (Soft Delete)")
 async def delete_user(
     user_id: str,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     user = await UserService.get_by_id(db, user_id)
@@ -91,7 +91,7 @@ async def delete_user(
 async def assign_role(
     user_id: str,
     role_id: str,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     # Verificar que el usuario y el rol existan
@@ -112,7 +112,7 @@ async def assign_role(
 async def remove_role(
     user_id: str,
     role_id: str,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     user = await UserService.get_by_id(db, user_id)

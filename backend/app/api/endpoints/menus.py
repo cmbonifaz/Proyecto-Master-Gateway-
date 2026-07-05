@@ -17,7 +17,7 @@ router = APIRouter()
 async def list_menus(
     skip: int = 0, 
     limit: int = 100,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     return await MenuService.list_active(db, skip=skip, limit=limit)
@@ -25,7 +25,7 @@ async def list_menus(
 
 @router.get("/tree", response_model=List[MenuNode], summary="Obtener árbol de menús jerárquico recursivo")
 async def get_menu_tree(
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -44,7 +44,7 @@ async def get_menu_tree(
 @router.get("/{menu_id}", response_model=MenuResponse, summary="Obtener menú por ID")
 async def get_menu(
     menu_id: str,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     menu = await MenuService.get_by_id(db, menu_id)
@@ -56,7 +56,7 @@ async def get_menu(
 @router.post("/", response_model=MenuResponse, status_code=status.HTTP_201_CREATED, summary="Crear un menú")
 async def create_menu(
     obj_in: MenuCreate,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     creator_id = current_user["user"].id
@@ -67,7 +67,7 @@ async def create_menu(
 async def update_menu(
     menu_id: str,
     obj_in: MenuUpdate,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     menu = await MenuService.get_by_id(db, menu_id)
@@ -84,7 +84,7 @@ async def update_menu(
 @router.delete("/{menu_id}", response_model=MenuResponse, summary="Eliminar un menú (Soft Delete)")
 async def delete_menu(
     menu_id: str,
-    current_user: CurrentUser = Depends(),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
     menu = await MenuService.get_by_id(db, menu_id)
