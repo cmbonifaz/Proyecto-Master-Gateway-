@@ -52,11 +52,17 @@ class Menu(BaseAudit):
         comment="UUID del menú padre. NULL si es elemento raíz.",
     )
 
-    # Hijos directos del nodo (lazy='selectin' para evitar N+1 en árbol pequeño)
+    # Relación al menú padre (Muchos-a-Uno)
+    parent = relationship(
+        "Menu",
+        remote_side="Menu.id",
+        back_populates="children",
+    )
+
+    # Hijos directos del nodo (Uno-a-Muchos)
     children = relationship(
         "Menu",
-        backref="parent",
-        foreign_keys=[parent_id],
+        back_populates="parent",
         lazy="selectin",
     )
 
