@@ -1,20 +1,37 @@
 # -*- coding: utf-8 -*-
 """
 conftest.py — Configuración de pytest y fixtures de base de datos.
-Utiliza la base de datos de desarrollo configurada, pero ejecuta cada test dentro de una
-transacción que se revierte automáticamente (rollback) al terminar.
+Utiliza SQLite en memoria cuando DATABASE_URL es sqlite (entorno CI),
+o la BD real cuando es PostgreSQL. Cada test corre en una transacción
+que se revierte automáticamente (rollback) al terminar.
 """
 import pytest
 import asyncio
 from typing import AsyncGenerator
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.pool import StaticPool
 from app.core.config import settings
 from app.core.database import Base, get_db
 from app.main import app
 
-# Motor de base de datos para pruebas
-engine = create_async_engine(settings.DATABASE_URL, echo=False)
+# ── Crear engine compatible con SQLite (CI) o PostgreSQL (producción) ──────────
+_IS_SQLITE = settings.DATABASE_URL.startswith("sqlite")
+
+if _IS_SQLITE:
+    # SQLite en memoria para CI: StaticPool mantiene la misma conexión
+    # en memoria durante toda la sesión de tests (necesario para que
+    # create_all y los tests compartan la misma BD en memoria)
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=False,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+else:
+    # PostgreSQL real (entorno de desarrollo/staging)
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+
 TestingSessionLocal = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
