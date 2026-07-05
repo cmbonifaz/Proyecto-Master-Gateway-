@@ -124,7 +124,7 @@ jobs:
             -Dsonar.exclusions=**/alembic/**,**/__pycache__/**,**/*.pyc,**/pipeline/**
 
       - name: Verificar Quality Gate de SonarQube (PowerShell)
-        shell: pwsh
+        shell: powershell
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
