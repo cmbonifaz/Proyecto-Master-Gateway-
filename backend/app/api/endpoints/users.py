@@ -16,10 +16,10 @@ router = APIRouter()
 
 @router.get("/", response_model=List[UserResponse], summary="Listar usuarios activos")
 async def list_users(
-    skip: int = 0, 
-    limit: int = 100,
     current_user: CurrentUser,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100,
 ):
     # Por defecto, cualquier rol autenticado puede listar (se puede restringir a ADMIN)
     return await UserService.list_active(db, skip=skip, limit=limit)

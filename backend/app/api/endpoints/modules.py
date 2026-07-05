@@ -15,10 +15,10 @@ router = APIRouter()
 
 @router.get("/", response_model=List[ModuleResponse], summary="Listar módulos activos")
 async def list_modules(
-    skip: int = 0, 
-    limit: int = 100,
     current_user: CurrentUser,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100,
 ):
     return await ModuleService.list_active(db, skip=skip, limit=limit)
 
