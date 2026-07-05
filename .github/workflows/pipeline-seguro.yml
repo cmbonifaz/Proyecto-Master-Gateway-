@@ -108,13 +108,6 @@ jobs:
           # Necesario para que SonarQube pueda calcular blame y blame-aware issues
           fetch-depth: 0
 
-      - name: Notificar inicio de SonarQube
-        shell: pwsh
-        run: |
-          Invoke-RestMethod -Uri "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" `
-            -Method POST `
-            -Body @{ chat_id = "${{ secrets.TELEGRAM_CHAT_ID }}"; text = "🔍 [JOB 2/4] SONARQUBE: Iniciando análisis estático de código en el PR #${{ github.event.pull_request.number }}." }
-
       - name: Ejecutar SonarQube Scanner
         uses: sonarsource/sonarqube-scan-action@master
         env:
@@ -136,27 +129,10 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-      # ── MANEJO DE FALLO EN SONAR ──
-      - name: Notificar fallo de Quality Gate a Telegram
-        if: failure()
-        shell: pwsh
-        run: |
-          Invoke-RestMethod -Uri "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" `
-            -Method POST `
-            -Body @{ chat_id = "${{ secrets.TELEGRAM_CHAT_ID }}"; text = "❌ [JOB 2/4] SONARQUBE FAIL: El Quality Gate no fue superado en el PR #${{ github.event.pull_request.number }}. Revisar el dashboard: ${{ secrets.SONAR_HOST_URL }}." }
-
-      # ── MANEJO DE ÉXITO EN SONAR ──
-      - name: Notificar éxito de SonarQube a Telegram
-        if: success()
-        shell: pwsh
-        run: |
-          Invoke-RestMethod -Uri "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" `
-            -Method POST `
-            -Body @{ chat_id = "${{ secrets.TELEGRAM_CHAT_ID }}"; text = "✅ [JOB 2/4] SONARQUBE PASS: Quality Gate superado en el PR #${{ github.event.pull_request.number }}. Sin deuda técnica crítica." }
-
   # ==============================================================================
   # JOB 3: MERGE AUTOMÁTICO Y PRUEBAS FUNCIONALES
   # Corre después del Gatekeeper ML Y del SonarQube (ambos deben pasar)
+  # Las notificaciones de Sonar se envían desde aquí (ubuntu-latest = curl real)
   # ==============================================================================
   auto-merge-and-test:
     name: "🧪 Merge a Test y Pytest"
@@ -168,6 +144,12 @@ jobs:
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
+
+      - name: Notificar SonarQube PASS a Telegram
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="✅ [JOB 2/4] SONARQUBE PASS: Quality Gate superado en el PR #${{ github.event.pull_request.number }}. Sin deuda técnica crítica."
 
       - name: Setup de Python 3.11 para pruebas
         uses: actions/setup-python@v5
