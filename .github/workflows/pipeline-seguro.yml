@@ -123,12 +123,51 @@ jobs:
             -Dsonar.python.version=3.11
             -Dsonar.exclusions=**/alembic/**,**/__pycache__/**,**/*.pyc,**/pipeline/**
 
-      - name: Verificar Quality Gate de SonarQube
-        uses: sonarsource/sonarqube-quality-gate-action@master
-        timeout-minutes: 5
+      - name: Verificar Quality Gate de SonarQube (PowerShell)
+        shell: pwsh
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          $headers = @{ Authorization = "Bearer $env:SONAR_TOKEN" }
+          $serverUrl = $env:SONAR_HOST_URL
+
+          # Leer el ceTaskId generado por el scanner
+          $reportFile = ".scannerwork/report-task.txt"
+          $content = Get-Content $reportFile
+          $ceTaskId = ($content | Where-Object { $_ -match "^ceTaskId=" }) -replace "^ceTaskId=", ""
+          Write-Host "Task ID: $ceTaskId"
+
+          # Esperar hasta que el análisis termine (máx 5 minutos)
+          $timeout = 300
+          $start = Get-Date
+          do {
+            Start-Sleep -Seconds 5
+            $task = Invoke-RestMethod -Uri "$serverUrl/api/ce/task?id=$ceTaskId" -Headers $headers
+            $taskStatus = $task.task.status
+            Write-Host "Análisis en progreso... Estado: $taskStatus"
+            if (((Get-Date) - $start).TotalSeconds -gt $timeout) {
+              Write-Error "Timeout: el análisis de SonarQube tardó más de 5 minutos."
+              exit 1
+            }
+          } while ($taskStatus -eq "PENDING" -or $taskStatus -eq "IN_PROGRESS")
+
+          if ($taskStatus -ne "SUCCESS") {
+            Write-Error "El análisis de SonarQube falló con estado: $taskStatus"
+            exit 1
+          }
+
+          # Verificar el Quality Gate
+          $analysisId = $task.task.analysisId
+          $qg = Invoke-RestMethod -Uri "$serverUrl/api/qualitygates/project_status?analysisId=$analysisId" -Headers $headers
+          $qgStatus = $qg.projectStatus.status
+          Write-Host "Quality Gate: $qgStatus"
+
+          if ($qgStatus -ne "OK") {
+            Write-Error "❌ Quality Gate FALLIDO: $qgStatus. Revisar $serverUrl/dashboard?id=Master-Gateway"
+            exit 1
+          }
+          Write-Host "✅ Quality Gate APROBADO"
 
   # ==============================================================================
   # JOB 3: MERGE AUTOMÁTICO Y PRUEBAS FUNCIONALES
