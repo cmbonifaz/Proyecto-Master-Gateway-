@@ -19,6 +19,7 @@ async def list_roles(
     db: AsyncSession = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
+    #Para la version 1 no se implementan busquedas por filtros 
 ):
     return await RoleService.list_active(db, skip=skip, limit=limit)
 
