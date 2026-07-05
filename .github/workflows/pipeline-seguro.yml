@@ -109,9 +109,10 @@ jobs:
           fetch-depth: 0
 
       - name: Notificar inicio de SonarQube
+        shell: bash
         run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" `
-            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" `
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
             -d "text=🔍 [JOB 2/4] SONARQUBE: Iniciando análisis estático de código en el PR #${{ github.event.pull_request.number }}."
 
       - name: Ejecutar SonarQube Scanner
@@ -138,17 +139,19 @@ jobs:
       # ── MANEJO DE FALLO EN SONAR ──
       - name: Notificar fallo de Quality Gate a Telegram
         if: failure()
+        shell: bash
         run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" `
-            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" `
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
             -d "text=❌ [JOB 2/4] SONARQUBE FAIL: El Quality Gate no fue superado en el PR #${{ github.event.pull_request.number }}. Revisar el dashboard de SonarQube en ${{ secrets.SONAR_HOST_URL }}."
 
       # ── MANEJO DE ÉXITO EN SONAR ──
       - name: Notificar éxito de SonarQube a Telegram
         if: success()
+        shell: bash
         run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" `
-            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" `
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
             -d "text=✅ [JOB 2/4] SONARQUBE PASS: Quality Gate superado en el PR #${{ github.event.pull_request.number }}. Sin deuda técnica crítica."
 
   # ==============================================================================
