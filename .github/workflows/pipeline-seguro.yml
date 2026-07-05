@@ -121,8 +121,8 @@ jobs:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         with:
           args: >
-            -Dsonar.projectKey=pipeline-seguro
-            -Dsonar.projectName="Pipeline Seguro — Master Gateway Auth"
+            -Dsonar.projectKey=Master-Gateway
+            -Dsonar.projectName="Master-Gateway"
             -Dsonar.sources=backend/app
             -Dsonar.tests=backend/tests
             -Dsonar.python.version=3.11
