@@ -10,6 +10,7 @@ from jose import JWTError
 from app.models.user import User
 from app.models.role import Role
 from app.models.user_role import UserRole
+from app.models.revoked_token import RevokedToken
 from app.core.security import verify_password, create_token, verify_token_type
 from app.schemas.auth import LoginRequest, RoleOption, TempTokenResponse, TokenResponse
 
@@ -133,12 +134,20 @@ class AuthService:
     ) -> Optional[TokenResponse]:
         """
         Renueva un Access Token utilizando un Refresh Token válido.
+        Revoca inmediatamente el refresh_token anterior para prevenir reutilización.
         """
         try:
             payload = verify_token_type(refresh_token, "refresh_token")
             user_id = payload.get("sub")
+            jti = payload.get("jti")  # JWT ID único por token
         except JWTError:
             return None
+
+        # Verificar que el token no esté revocado (lista negra)
+        stmt_check = select(RevokedToken).where(RevokedToken.token == refresh_token)
+        existing = await db.execute(stmt_check)
+        if existing.scalar_one_or_none():
+            return None  # Token ya fue usado/revocado — posible replay attack
 
         # Validar que el rol sigue activo para el usuario
         stmt = select(UserRole).where(
@@ -154,6 +163,10 @@ class AuthService:
         if not user_role:
             return None
 
+        # Revocar el refresh_token anterior (prevención de reutilización)
+        db.add(RevokedToken(token=refresh_token, user_id=user_id))
+        await db.flush()
+
         new_access = create_token(
             subject=user_id,
             token_type="access_token",
@@ -168,3 +181,24 @@ class AuthService:
             access_token=new_access,
             refresh_token=new_refresh
         )
+
+    @staticmethod
+    async def logout(db: AsyncSession, refresh_token: str) -> None:
+        """
+        Cierra la sesión del usuario invalidando su Refresh Token en la lista negra.
+        El Access Token (stateless) expira naturalmente por su TTL corto.
+        Si el token ya está revocado o es inválido, se retorna silenciosamente
+        (idempotente) para no revelar información al atacante.
+        """
+        try:
+            payload = verify_token_type(refresh_token, "refresh_token")
+            user_id = payload.get("sub")
+        except JWTError:
+            return  # Token inválido — ignorar silenciosamente (idempotente)
+
+        # Verificar que no esté ya revocado
+        stmt_check = select(RevokedToken).where(RevokedToken.token == refresh_token)
+        existing = await db.execute(stmt_check)
+        if not existing.scalar_one_or_none():
+            db.add(RevokedToken(token=refresh_token, user_id=user_id))
+            await db.flush()
