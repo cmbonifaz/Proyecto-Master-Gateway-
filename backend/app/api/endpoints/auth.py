@@ -5,7 +5,7 @@ auth.py — Endpoints HTTP para el flujo de autenticación (Paso 1 y Paso 2).
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.schemas.auth import LoginRequest, TempTokenResponse, RoleSelectRequest, TokenResponse, RefreshTokenRequest
+from app.schemas.auth import LoginRequest, TempTokenResponse, RoleSelectRequest, TokenResponse, RefreshTokenRequest, LogoutRequest
 from app.services.auth_service import AuthService
 
 router = APIRouter()
@@ -79,3 +79,21 @@ async def refresh_token(
             detail="Refresh token inválido, expirado o rol inhabilitado"
         )
     return res
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_200_OK,
+    summary="Cierre de sesión — Invalida los tokens activos del usuario"
+)
+async def logout(
+    obj_in: LogoutRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Invalida el Refresh Token del usuario en la base de datos.
+    Necesario para cortar la sesión de inmediato en caso de compromiso.
+    El Access Token (JWT stateless) expirará por sí solo al alcanzar su TTL corto.
+    """
+    await AuthService.logout(db, obj_in.refresh_token)
+    return {"detail": "Sesión cerrada correctamente"}
