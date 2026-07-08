@@ -11,3 +11,4 @@ from app.models.menu import Menu               # noqa: F401
 from app.models.user_role import UserRole      # noqa: F401
 from app.models.role_module import RoleModule  # noqa: F401
 from app.models.role_menu import RoleMenu      # noqa: F401
+from app.models.revoked_token import RevokedToken  # noqa: F401

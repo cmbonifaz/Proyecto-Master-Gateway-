@@ -76,6 +76,14 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str = Field(..., description="Refresh token activo")
 
 
+class LogoutRequest(BaseModel):
+    """
+    Petición para cerrar sesión.
+    Se invalida el refresh_token provisto para bloquear cualquier renovación futura.
+    """
+    refresh_token: str = Field(..., description="Refresh token activo que se desea invalidar")
+
+
 class TokenPayload(BaseModel):
     """
     Payload decodificado de los tokens.
