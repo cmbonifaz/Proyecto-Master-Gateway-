@@ -2,35 +2,95 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Activity, ShieldCheck, Users, Server, AlertTriangle } from 'lucide-react';
+import { Activity, ShieldCheck, Users, Server, AlertTriangle, Layers, ChevronRight } from 'lucide-react';
 import { RolesService } from '@/services/roles.service';
 import { UsersService } from '@/services/users.service';
+import { Module } from '@/services/modules.service';
+import Link from 'next/link';
 
 export default function DashboardPage() {
   const { currentRole, roles } = useAuth();
   const [stats, setStats] = useState({ roles: 0, users: 0, activeServices: 4 });
-  
-  useEffect(() => {
-    // Fetch some basic stats
-    const fetchStats = async () => {
-      try {
-        const [rolesData, usersData] = await Promise.all([
-          RolesService.getRoles(),
-          UsersService.getUsers()
-        ]);
-        setStats(prev => ({
-          ...prev,
-          roles: rolesData.length,
-          users: usersData.length
-        }));
-      } catch (e) {
-        console.error("Failed to load dashboard stats", e);
-      }
-    };
-    fetchStats();
-  }, []);
-
+  const [userModules, setUserModules] = useState<Module[]>([]);
   const activeRoleName = roles.find(r => r.id === currentRole)?.nombre || 'Unknown';
+  const isAdmin = activeRoleName.toLowerCase() === 'admin' || activeRoleName.toLowerCase() === 'administrador';
+
+  useEffect(() => {
+    // Si es administrador, carga estadísticas
+    if (isAdmin) {
+      const fetchStats = async () => {
+        try {
+          const [rolesData, usersData] = await Promise.all([
+            RolesService.getRoles(),
+            UsersService.getUsers()
+          ]);
+          setStats(prev => ({
+            ...prev,
+            roles: rolesData.length,
+            users: usersData.length
+          }));
+        } catch (e) {
+          console.error("Failed to load dashboard stats", e);
+        }
+      };
+      fetchStats();
+    }
+    
+    // Carga los módulos permitidos para el rol activo (tanto para admin como normales)
+    if (currentRole) {
+      const fetchModules = async () => {
+        try {
+          const perms = await RolesService.getRolePermissions(currentRole);
+          setUserModules(perms.modules || []);
+        } catch (e) {
+          console.error("Failed to load user modules", e);
+        }
+      };
+      fetchModules();
+    }
+  }, [isAdmin, currentRole]);
+
+  if (!isAdmin) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-headline-lg text-[var(--color-on-surface)]">Bienvenido al Gateway</h1>
+          <div className="bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)] px-4 py-2 rounded-full text-label-md flex items-center gap-2">
+            <ShieldCheck size={16} />
+            Rol: {activeRoleName}
+          </div>
+        </div>
+
+        <p className="text-body-lg text-[var(--color-on-surface-variant)] mb-8">
+          Selecciona uno de los módulos a los que tienes acceso:
+        </p>
+
+        {userModules.length === 0 ? (
+          <div className="bg-[var(--color-surface-container-low)] p-8 rounded-lg text-center border border-[var(--color-outline-variant)]">
+            <Layers size={48} className="mx-auto text-[var(--color-on-surface-variant)] opacity-50 mb-4" />
+            <p className="text-body-lg text-[var(--color-on-surface-variant)]">No tienes módulos asignados.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {userModules.map(mod => (
+              <Link href={`/dashboard`} key={mod.id} className="block group">
+                <div className="bg-white p-6 rounded-lg shadow-elevation-1 hover:shadow-elevation-3 transition-all border border-[var(--color-outline-variant)] hover:border-[var(--color-primary)] h-full flex flex-col">
+                  <div className="w-12 h-12 bg-[var(--color-secondary-container)] text-[var(--color-on-secondary-container)] rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <Layers size={24} />
+                  </div>
+                  <h3 className="text-title-lg text-[var(--color-on-surface)] font-bold mb-2">{mod.nombre}</h3>
+                  <p className="text-body-md text-[var(--color-on-surface-variant)] flex-1">{mod.descripcion || 'Sin descripción'}</p>
+                  <div className="mt-4 flex items-center text-[var(--color-primary)] font-medium text-label-lg group-hover:translate-x-2 transition-transform">
+                    Acceder al módulo <ChevronRight size={18} className="ml-1" />
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -110,6 +170,24 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="text-title-lg text-[var(--color-on-surface)] mb-4 font-bold flex items-center gap-2">
+          <Layers className="text-[var(--color-primary)]" /> Módulos Asignados
+        </h2>
+        {userModules.length === 0 ? (
+          <p className="text-body-md text-[var(--color-on-surface-variant)]">No tienes módulos asignados.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {userModules.map(mod => (
+              <div key={mod.id} className="bg-white p-5 rounded-lg shadow-elevation-1 border border-[var(--color-outline-variant)]">
+                <h3 className="text-title-md text-[var(--color-on-surface)] font-bold mb-1 truncate">{mod.nombre}</h3>
+                <p className="text-body-sm text-[var(--color-on-surface-variant)] line-clamp-2">{mod.descripcion || 'Sin descripción'}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

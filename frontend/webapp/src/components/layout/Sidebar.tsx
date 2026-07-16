@@ -16,7 +16,30 @@ import {
   ChevronRight,
   ExternalLink,
   Loader2,
+  Activity,
+  Server,
+  Box,
+  Settings,
+  User,
+  FileText,
+  Database,
+  CreditCard,
+  Briefcase,
+  Calendar,
+  Folder,
 } from 'lucide-react';
+
+const ICON_MAP: Record<string, React.ElementType> = {
+  Shield, Users, Layers, Menu: MenuIcon, LogOut, LayoutDashboard,
+  Activity, Server, Box, Settings, User, FileText, Database, CreditCard,
+  Briefcase, Calendar, Folder
+};
+
+const renderIcon = (iconName: string | null | undefined, size = 18) => {
+  if (!iconName) return null;
+  const IconCmp = ICON_MAP[iconName] || MenuIcon;
+  return <IconCmp size={size} />;
+};
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -62,24 +85,28 @@ function DynamicMenuNode({ node, depth = 0 }: { node: MenuNode; depth?: number }
 
   // Nodo con URL — enlace de navegación
   if (node.url && !hasChildren) {
-    return (
-      <Link
-        href={node.url}
-        className={`flex items-center gap-2 py-2 pr-3 rounded text-body-sm transition-all border-l-2 ${
-          isActive
-            ? 'bg-[var(--color-secondary-container)] text-[var(--color-on-secondary-container)] font-semibold border-[var(--color-secondary)]'
-            : 'text-[var(--color-on-surface)] hover:bg-[var(--color-surface-container-low)] border-transparent'
-        }`}
-        style={{ paddingLeft }}
-      >
-        {node.icono ? (
-          <span className="text-xs opacity-70 flex-shrink-0">{node.icono}</span>
-        ) : (
-          <ExternalLink size={13} className="flex-shrink-0 opacity-50" />
-        )}
-        <span className="truncate">{node.texto}</span>
-      </Link>
-    );
+    const isInternal = node.url.startsWith('/dashboard') || node.url.startsWith('#');
+    const baseClasses = `flex items-center gap-3 py-2.5 pr-3 rounded text-body-sm transition-colors border-l-4 ${
+      isActive
+        ? 'bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)] font-semibold border-[var(--color-primary)]'
+        : 'text-[var(--color-on-surface)] hover:bg-[var(--color-surface-container-low)] border-transparent'
+    }`;
+    
+    if (isInternal) {
+      return (
+        <Link href={node.url} className={baseClasses} style={{ paddingLeft }}>
+          {node.icono ? renderIcon(node.icono, 18) : <ExternalLink size={18} className="opacity-50" />}
+          <span className="truncate">{node.texto}</span>
+        </Link>
+      );
+    } else {
+      return (
+        <a href={node.url} className={baseClasses} style={{ paddingLeft }}>
+          {node.icono ? renderIcon(node.icono, 18) : <ExternalLink size={18} className="opacity-50" />}
+          <span className="truncate">{node.texto}</span>
+        </a>
+      );
+    }
   }
 
   // Nodo contenedor (sin URL, tiene hijos) — colapsable
@@ -87,24 +114,20 @@ function DynamicMenuNode({ node, depth = 0 }: { node: MenuNode; depth?: number }
     <div>
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`w-full flex items-center gap-2 py-2 pr-3 rounded text-body-sm transition-all border-l-2 ${
+        className={`w-full flex items-center gap-3 py-2.5 pr-3 rounded text-body-sm transition-colors border-l-4 ${
           open
-            ? 'text-[var(--color-on-surface)] bg-[var(--color-surface-container-low)] border-[var(--color-outline-variant)]'
-            : 'text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-low)] border-transparent'
+            ? 'text-[var(--color-on-surface)] bg-[var(--color-surface-container-low)] border-transparent font-medium'
+            : 'text-[var(--color-on-surface)] hover:bg-[var(--color-surface-container-low)] border-transparent'
         }`}
         style={{ paddingLeft }}
       >
-        {node.icono ? (
-          <span className="text-xs opacity-70 flex-shrink-0">{node.icono}</span>
-        ) : (
-          <MenuIcon size={13} className="flex-shrink-0 opacity-50" />
-        )}
+        {node.icono ? renderIcon(node.icono, 18) : <Folder size={18} className="opacity-50" />}
         <span className="truncate flex-1 text-left">{node.texto}</span>
-        {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        {open ? <ChevronDown size={14} className="opacity-70" /> : <ChevronRight size={14} className="opacity-70" />}
       </button>
 
       {open && (
-        <div className="mt-0.5 space-y-0.5">
+        <div className="mt-1 space-y-1">
           {node.children.map((child) => (
             <DynamicMenuNode key={child.id} node={child} depth={depth + 1} />
           ))}
@@ -125,6 +148,7 @@ export function Sidebar() {
   const [menuError, setMenuError] = useState(false);
 
   const currentRoleName = roles.find((r) => r.id === currentRole)?.nombre || 'Admin';
+  const isAdmin = currentRoleName.toLowerCase() === 'admin' || currentRoleName.toLowerCase() === 'administrador';
 
   // Cargar árbol de menús dinámico según el rol del token
   const loadMenuTree = useCallback(async () => {
@@ -159,36 +183,40 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto">
-        {/* ── Sección Administración del Gateway (hardcoded, siempre visible) ── */}
-        <div className="px-4 pt-4 pb-2">
-          <p className="text-label-md text-[var(--color-on-surface-variant)] uppercase tracking-wider mb-2 px-1 text-xs">
-            Administración
-          </p>
-          <div className="space-y-1">
-            {ADMIN_ITEMS.map((item) => {
-              const isActive =
-                pathname === item.href ||
-                (pathname.startsWith(item.href) && item.href !== '/dashboard');
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded text-body-sm transition-colors border-l-4 ${
-                    isActive
-                      ? 'bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)] font-semibold border-[var(--color-primary)]'
-                      : 'text-[var(--color-on-surface)] hover:bg-[var(--color-surface-container-low)] border-transparent'
-                  }`}
-                >
-                  <item.icon size={18} />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
+        {isAdmin && (
+          <>
+            {/* ── Sección Administración del Gateway (hardcoded, siempre visible para admin) ── */}
+            <div className="px-4 pt-4 pb-2">
+              <p className="text-label-md text-[var(--color-on-surface-variant)] uppercase tracking-wider mb-2 px-1 text-xs">
+                Administración
+              </p>
+              <div className="space-y-1">
+                {ADMIN_ITEMS.map((item) => {
+                  const isActive =
+                    pathname === item.href ||
+                    (pathname.startsWith(item.href) && item.href !== '/dashboard');
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded text-body-sm transition-colors border-l-4 ${
+                        isActive
+                          ? 'bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)] font-semibold border-[var(--color-primary)]'
+                          : 'text-[var(--color-on-surface)] hover:bg-[var(--color-surface-container-low)] border-transparent'
+                      }`}
+                    >
+                      <item.icon size={18} />
+                      {item.name}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
 
-        {/* ── Divisor ── */}
-        <div className="mx-4 my-3 border-t border-[var(--color-outline-variant)]" />
+            {/* ── Divisor ── */}
+            <div className="mx-4 my-3 border-t border-[var(--color-outline-variant)]" />
+          </>
+        )}
 
         {/* ── Sección Menús Dinámicos (por rol, desde la API) ── */}
         <div className="px-4 pb-4">

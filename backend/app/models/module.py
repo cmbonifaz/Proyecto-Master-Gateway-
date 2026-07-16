@@ -34,5 +34,13 @@ class Module(BaseAudit):
         lazy="selectin",
     )
 
+    # Relación 1:M con Menús
+    menus = relationship(
+        "Menu",
+        back_populates="modulo",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
     def __repr__(self):
         return f"<Module id={self.id} nombre={self.nombre} estado={self.estado}>"

@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { MenusService, Menu } from '@/services/menus.service';
+import { ModulesService, Module } from '@/services/modules.service';
 import { Menu as MenuIcon, Plus, Trash2, Edit, ChevronRight } from 'lucide-react';
 
 const menuSchema = z.object({
@@ -13,6 +14,7 @@ const menuSchema = z.object({
   icono: z.string().optional(),
   orden: z.string().optional(),
   parent_id: z.string().optional(),
+  modulo_id: z.string().min(1, "Debe seleccionar un módulo"),
 });
 
 type MenuFormValues = z.infer<typeof menuSchema>;
@@ -77,6 +79,7 @@ function MenuRow({ menu, depth, onDelete, onEdit }: {
 
 export default function MenusPage() {
   const [menus, setMenus] = useState<Menu[]>([]);
+  const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -86,23 +89,27 @@ export default function MenusPage() {
     resolver: zodResolver(menuSchema),
   });
 
-  const fetchMenus = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const data = await MenusService.getMenus();
-      setMenus(data);
+      const [menusData, modulesData] = await Promise.all([
+        MenusService.getMenus(),
+        ModulesService.getModules()
+      ]);
+      setMenus(menusData);
+      setModules(modulesData);
     } catch (e: any) {
-      setError(e.response?.data?.detail || 'Error cargando menús');
+      setError(e.response?.data?.detail || 'Error cargando datos');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchMenus(); }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const openNewModal = () => {
     setEditingMenu(null);
-    reset({ texto: '', url: '', icono: '', orden: '', parent_id: '' });
+    reset({ texto: '', url: '', icono: '', orden: '', parent_id: '', modulo_id: '' });
     setIsModalOpen(true);
   };
 
@@ -113,6 +120,8 @@ export default function MenusPage() {
     setValue('icono', menu.icono || '');
     setValue('orden', menu.orden || '');
     setValue('parent_id', menu.parent_id || '');
+    // @ts-ignore (modulo_id exists now)
+    setValue('modulo_id', menu.modulo_id || '');
     setIsModalOpen(true);
   };
 
@@ -124,6 +133,7 @@ export default function MenusPage() {
         icono: data.icono || undefined,
         orden: data.orden || undefined,
         parent_id: data.parent_id || undefined,
+        modulo_id: data.modulo_id,
       };
       if (editingMenu) {
         await MenusService.updateMenu(editingMenu.id, payload);
@@ -133,7 +143,7 @@ export default function MenusPage() {
       setIsModalOpen(false);
       reset();
       setEditingMenu(null);
-      fetchMenus();
+      fetchData();
     } catch (e: any) {
       setError(e.response?.data?.detail || `Error ${editingMenu ? 'actualizando' : 'creando'} menú`);
     }
@@ -143,7 +153,7 @@ export default function MenusPage() {
     if (!confirm('¿Estás seguro de eliminar este menú?')) return;
     try {
       await MenusService.deleteMenu(id);
-      fetchMenus();
+      fetchData();
     } catch (e: any) {
       alert(e.response?.data?.detail || 'Error eliminando menú');
     }
@@ -220,12 +230,26 @@ export default function MenusPage() {
               </div>
 
               <div>
+                <label className="block text-label-md text-[var(--color-on-surface)] mb-1">MÓDULO AL QUE PERTENECE *</label>
+                <select
+                  {...register('modulo_id')}
+                  className={`w-full px-3 py-2 border rounded text-body-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] bg-white ${errors.modulo_id ? 'border-[var(--color-error)]' : 'border-[var(--color-outline-variant)]'}`}
+                >
+                  <option value="">— Seleccione un módulo —</option>
+                  {modules.map(m => (
+                    <option key={m.id} value={m.id}>{m.nombre}</option>
+                  ))}
+                </select>
+                {errors.modulo_id && <p className="text-[var(--color-error)] text-body-sm mt-1">{errors.modulo_id.message}</p>}
+              </div>
+
+              <div>
                 <label className="block text-label-md text-[var(--color-on-surface)] mb-1">MENÚ PADRE (OPCIONAL)</label>
                 <select
                   {...register('parent_id')}
                   className="w-full px-3 py-2 border border-[var(--color-outline-variant)] rounded text-body-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] bg-white"
                 >
-                  <option value="">— Ninguno (menú raíz) —</option>
+                  <option value="">— Ninguno (menú raíz del módulo) —</option>
                   {menus
                     .filter(m => !editingMenu || m.id !== editingMenu.id)
                     .map(m => (
