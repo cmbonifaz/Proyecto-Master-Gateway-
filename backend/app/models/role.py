@@ -28,6 +28,8 @@ class Role(BaseAudit):
     users = relationship(
         "User",
         secondary="user_roles",
+        primaryjoin="and_(Role.id == UserRole.role_id, UserRole.estado == 'ACTIVO')",
+        secondaryjoin="and_(User.id == UserRole.user_id, User.estado == 'ACTIVO')",
         back_populates="roles",
         lazy="selectin",
     )
