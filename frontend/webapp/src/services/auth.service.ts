@@ -6,6 +6,11 @@ export const AuthService = {
     return data; // { temp_token, roles: [...] }
   },
 
+  register: async (credentials: { email: string; password: string; nombre: string }) => {
+    const { data } = await api.post('/api/auth/register', credentials);
+    return data;
+  },
+
   selectRole: async (payload: { temp_token: string; role_id: string }) => {
     const { data } = await api.post('/api/auth/select-role', payload);
     return data; // { access_token, refresh_token, token_type }

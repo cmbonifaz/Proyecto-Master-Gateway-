@@ -18,6 +18,11 @@ export const ModulesService = {
     return data;
   },
 
+  updateModule: async (id: string, payload: { nombre?: string; descripcion?: string }) => {
+    const { data } = await apiAuth.put(`/api/modules/${id}`, payload);
+    return data;
+  },
+
   deleteModule: async (id: string) => {
     const { data } = await apiAuth.delete(`/api/modules/${id}`);
     return data;

@@ -26,6 +26,11 @@ export const MenusService = {
     return data;
   },
 
+  updateMenu: async (id: string, payload: { texto?: string; url?: string; icono?: string; orden?: string; parent_id?: string }) => {
+    const { data } = await apiAuth.put(`/api/menus/${id}`, payload);
+    return data;
+  },
+
   deleteMenu: async (id: string) => {
     const { data } = await apiAuth.delete(`/api/menus/${id}`);
     return data;

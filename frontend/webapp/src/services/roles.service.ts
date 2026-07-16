@@ -13,6 +13,16 @@ export const RolesService = {
     return data;
   },
 
+  getRoleById: async (id: string) => {
+    const { data } = await apiAuth.get(`/api/roles/${id}`);
+    return data;
+  },
+
+  getRolePermissions: async (id: string) => {
+    const { data } = await apiAuth.get(`/api/roles/${id}/permissions`);
+    return data; // { users: [...], modules: [...], menus: [...] }
+  },
+
   createRole: async (payload: { nombre: string; descripcion?: string }) => {
     const { data } = await apiAuth.post('/api/roles/', payload);
     return data;

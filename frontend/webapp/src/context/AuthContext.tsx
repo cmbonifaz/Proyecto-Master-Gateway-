@@ -26,18 +26,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     const roleId = localStorage.getItem('role_id');
-    
+    const savedRoles = localStorage.getItem('user_roles');
+
     if (token) {
       AuthService.validateToken()
         .then(() => {
           setIsAuthenticated(true);
           setCurrentRole(roleId);
+          if (savedRoles) {
+            try { setRoles(JSON.parse(savedRoles)); } catch {}
+          }
         })
         .catch(() => {
           setIsAuthenticated(false);
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
           localStorage.removeItem('role_id');
+          localStorage.removeItem('user_roles');
         })
         .finally(() => setLoading(false));
     } else {
@@ -48,6 +53,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async (credentials: any) => {
     const data = await AuthService.login(credentials);
     setRoles(data.roles);
+    localStorage.setItem('user_roles', JSON.stringify(data.roles));
     return data;
   };
 
@@ -73,8 +79,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('role_id');
+      localStorage.removeItem('user_roles');
       setIsAuthenticated(false);
       setCurrentRole(null);
+      setRoles([]);
       router.push('/login');
     }
   };
