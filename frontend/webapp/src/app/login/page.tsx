@@ -16,7 +16,12 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   nombre: z.string().min(2, { message: 'El nombre es obligatorio' }),
   email: z.string().email({ message: 'Correo electrónico inválido' }),
-  password: z.string().min(8, { message: 'La contraseña debe tener al menos 8 caracteres' }),
+  password: z.string()
+    .min(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
+    .regex(/[A-Z]/, { message: 'Debe contener al menos una mayúscula' })
+    .regex(/[a-z]/, { message: 'Debe contener al menos una minúscula' })
+    .regex(/[0-9]/, { message: 'Debe contener al menos un número' })
+    .regex(/[!@#$%^&*(),.?":{}|<>]/, { message: 'Debe contener al menos un carácter especial' }),
   confirmPassword: z.string()
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Las contraseñas no coinciden",
@@ -75,7 +80,13 @@ export default function LoginPage() {
     if (detail && typeof detail === 'object') {
       return JSON.stringify(detail);
     }
-    return defaultMsg;
+    if (typeof err.response?.data === 'string') {
+      return err.response.data;
+    }
+    if (err.response?.data?.message) {
+      return err.response.data.message;
+    }
+    return err.message || defaultMsg;
   };
 
   const onLoginSubmit = async (data: LoginFormValues) => {

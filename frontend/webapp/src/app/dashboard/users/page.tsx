@@ -9,12 +9,63 @@ import { RolesService, Role } from '@/services/roles.service';
 import { Users, Plus, Trash2, Edit, Shield, X, Check } from 'lucide-react';
 
 const userSchema = z.object({
+  id: z.string().optional(),
   email: z.string().email("Correo inválido"),
   nombre: z.string().min(2, "Mínimo 2 caracteres"),
-  password: z.string().min(8, "Mínimo 8 caracteres").optional().or(z.literal('')),
+  password: z.string().optional().or(z.literal('')),
+}).superRefine((val, ctx) => {
+  // Si estamos creando un nuevo usuario (sin ID en el formulario)
+  if (!val.id) {
+    if (!val.password) {
+      ctx.addIssue({ 
+        code: z.ZodIssueCode.custom, 
+        message: "La contraseña es obligatoria para nuevos usuarios", 
+        path: ["password"] 
+      });
+      return;
+    }
+  }
+
+  if (val.password) {
+    if (val.password.length < 8) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La contraseña debe tener al menos 8 caracteres", path: ["password"] });
+    }
+    if (!/[A-Z]/.test(val.password)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debe contener al menos una mayúscula", path: ["password"] });
+    }
+    if (!/[a-z]/.test(val.password)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debe contener al menos una minúscula", path: ["password"] });
+    }
+    if (!/[0-9]/.test(val.password)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debe contener al menos un número", path: ["password"] });
+    }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(val.password)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debe contener al menos un carácter especial", path: ["password"] });
+    }
+  }
 });
 
 type UserFormValues = z.infer<typeof userSchema>;
+
+const handleAxiosError = (err: any, defaultMsg: string) => {
+  const detail = err.response?.data?.detail;
+  if (typeof detail === 'string') {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    return detail.map((d: any) => d.msg ? d.msg.replace(/^Value error, /, '') : JSON.stringify(d)).join(', ');
+  }
+  if (detail && typeof detail === 'object') {
+    return JSON.stringify(detail);
+  }
+  if (typeof err.response?.data === 'string') {
+    return err.response.data;
+  }
+  if (err.response?.data?.message) {
+    return err.response.data.message;
+  }
+  return err.message || defaultMsg;
+};
 
 function RoleChip({ label, active, onToggle, loading }: { label: string; active: boolean; onToggle: () => void; loading?: boolean }) {
   return (
@@ -44,9 +95,19 @@ export default function UsersPage() {
   const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [toggling, setToggling] = useState<string | null>(null);
 
-  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<UserFormValues>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<UserFormValues>({
     resolver: zodResolver(userSchema),
   });
+
+  const formPassword = watch('password', '') || '';
+
+  const passwordRequirements = [
+    { label: 'Mínimo 8 caracteres', met: formPassword.length >= 8 },
+    { label: 'Al menos una mayúscula', met: /[A-Z]/.test(formPassword) },
+    { label: 'Al menos una minúscula', met: /[a-z]/.test(formPassword) },
+    { label: 'Al menos un número', met: /[0-9]/.test(formPassword) },
+    { label: 'Al menos un carácter especial (!@#$%^&...)', met: /[!@#$%^&*(),.?":{}|<>]/.test(formPassword) },
+  ];
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -54,7 +115,7 @@ export default function UsersPage() {
       const data = await UsersService.getUsers();
       setUsers(data);
     } catch (e: any) {
-      setError(e.response?.data?.detail || 'Error cargando usuarios');
+      setError(handleAxiosError(e, 'Error cargando usuarios'));
     } finally {
       setLoading(false);
     }
@@ -63,16 +124,16 @@ export default function UsersPage() {
   useEffect(() => { fetchUsers(); }, []);
 
   const openNewModal = () => {
+    setError('');
     setEditingUserId(null);
-    reset({ email: '', nombre: '', password: '' });
+    reset({ id: '', email: '', nombre: '', password: '' });
     setIsFormOpen(true);
   };
 
   const openEditModal = (user: User) => {
+    setError('');
     setEditingUserId(user.id);
-    setValue('email', user.email);
-    setValue('nombre', user.nombre);
-    setValue('password', '');
+    reset({ id: user.id, email: user.email, nombre: user.nombre, password: '' });
     setIsFormOpen(true);
   };
 
@@ -104,7 +165,7 @@ export default function UsersPage() {
       const updatedUser = updatedUsers.find((u: User) => u.id === rolesModal.id);
       if (updatedUser) setRolesModal(updatedUser);
     } catch (e: any) {
-      setError(e.response?.data?.detail || 'Error al cambiar rol');
+      setError(handleAxiosError(e, 'Error al cambiar rol'));
     } finally {
       setToggling(null);
     }
@@ -124,7 +185,7 @@ export default function UsersPage() {
       reset();
       fetchUsers();
     } catch (e: any) {
-      setError(e.message || e.response?.data?.detail || 'Error guardando usuario');
+      setError(handleAxiosError(e, 'Error guardando usuario'));
     }
   };
 
@@ -134,7 +195,7 @@ export default function UsersPage() {
       await UsersService.deleteUser(id);
       fetchUsers();
     } catch (e: any) {
-      alert(e.response?.data?.detail || 'Error eliminando usuario');
+      alert(handleAxiosError(e, 'Error eliminando usuario'));
     }
   };
 
@@ -221,9 +282,16 @@ export default function UsersPage() {
           <div className="bg-white rounded-lg shadow-elevation-2 w-full max-w-md border border-[var(--color-outline-variant)]">
             <div className="px-6 py-4 border-b border-[var(--color-outline-variant)] flex justify-between items-center">
               <h2 className="text-headline-sm text-[var(--color-on-surface)]">{editingUserId ? 'Editar Usuario' : 'Nuevo Usuario'}</h2>
-              <button onClick={() => setIsFormOpen(false)} className="text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)]">&times;</button>
+              <button onClick={() => { setIsFormOpen(false); setError(''); }} className="text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)]">&times;</button>
             </div>
             <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+              <input type="hidden" {...register('id')} />
+              {error && (
+                <div className="bg-[var(--color-error-container)] text-[var(--color-on-error-container)] p-3 rounded text-body-sm border border-[#ffb4ab] flex justify-between items-center">
+                  <span>{error}</span>
+                  <button type="button" onClick={() => setError('')} className="font-bold ml-2">✕</button>
+                </div>
+              )}
               <div>
                 <label className="block text-label-md text-[var(--color-on-surface)] mb-1">NOMBRE COMPLETO *</label>
                 <input {...register('nombre')}
@@ -246,9 +314,28 @@ export default function UsersPage() {
                   className={`w-full px-3 py-2 border rounded text-body-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${errors.password ? 'border-[var(--color-error)]' : 'border-[var(--color-outline-variant)]'}`}
                   placeholder="••••••••" />
                 {errors.password && <p className="text-[var(--color-error)] text-body-sm mt-1">{errors.password.message}</p>}
+                
+                {/* Feedback visual de requerimientos */}
+                {(!editingUserId || formPassword) && (
+                  <div className="mt-2 space-y-1.5 bg-[var(--color-surface-container-low)] p-3 rounded-md border border-[var(--color-outline-variant)]">
+                    <p className="text-[11px] font-semibold text-[var(--color-on-surface-variant)] uppercase tracking-wider mb-1">Criterios de Seguridad:</p>
+                    {passwordRequirements.map((req, i) => (
+                      <div key={i} className="flex items-center gap-2 text-body-sm transition-all duration-200">
+                        {req.met ? (
+                          <Check size={14} className="text-green-500 stroke-[3]" />
+                        ) : (
+                          <X size={14} className="text-[var(--color-outline)] opacity-50" />
+                        )}
+                        <span className={req.met ? 'text-green-800 font-medium' : 'text-[var(--color-on-surface-variant)] opacity-70'}>
+                          {req.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex justify-end gap-3 mt-6">
-                <button type="button" onClick={() => setIsFormOpen(false)}
+                <button type="button" onClick={() => { setIsFormOpen(false); setError(''); }}
                   className="px-4 py-2 border border-[var(--color-outline-variant)] text-[var(--color-on-surface)] rounded hover:bg-[var(--color-surface-container-low)]">
                   Cancelar
                 </button>

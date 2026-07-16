@@ -22,7 +22,8 @@ export const AuthService = {
   },
 
   validateToken: async () => {
-    const { data } = await apiAuth.post('/api/internals/validate-token');
+    const token = localStorage.getItem('access_token');
+    const { data } = await apiAuth.post('/api/internals/validate-token', { token });
     return data;
   }
 };
