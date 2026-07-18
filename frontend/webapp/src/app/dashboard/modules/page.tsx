@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ModulesService, Module } from '@/services/modules.service';
 import { Layers, Plus, Trash2, Edit } from 'lucide-react';
+import { AuditDetails } from '@/components/ui/AuditDetails';
 
 const moduleSchema = z.object({
   nombre: z.string().min(3, "Mínimo 3 caracteres"),
@@ -129,10 +130,11 @@ export default function ModulesPage() {
                     <span className="bg-[#ccfbf1] text-[#115e59] px-2 py-1 rounded-full text-xs font-bold">{mod.estado}</span>
                   </td>
                   <td className="px-6 py-4 text-right space-x-1">
-                    <button onClick={() => openEditModal(mod)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-container)] rounded transition-colors" title="Editar">
+                    <AuditDetails data={mod} title="Auditoría de Módulo" />
+                    <button onClick={() => openEditModal(mod)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-container)] rounded transition-colors inline-flex items-center justify-center" title="Editar">
                       <Edit size={18} />
                     </button>
-                    <button onClick={() => handleDelete(mod.id)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-error)] hover:bg-[var(--color-error-container)] rounded transition-colors" title="Eliminar">
+                    <button onClick={() => handleDelete(mod.id)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-error)] hover:bg-[var(--color-error-container)] rounded transition-colors inline-flex items-center justify-center" title="Eliminar">
                       <Trash2 size={18} />
                     </button>
                   </td>

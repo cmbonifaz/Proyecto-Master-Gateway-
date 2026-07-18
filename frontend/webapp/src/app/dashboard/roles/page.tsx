@@ -10,6 +10,7 @@ import { ModulesService, Module } from '@/services/modules.service';
 import { MenusService, Menu } from '@/services/menus.service';
 import { Shield, Plus, Trash2, Settings, Users, Layers, Menu as MenuIcon, X, Check, Filter } from 'lucide-react';
 import { ALL_ICONS } from '@/components/ui/IconPicker';
+import { AuditDetails } from '@/components/ui/AuditDetails';
 
 const roleSchema = z.object({
   nombre: z.string().min(3, "Mínimo 3 caracteres").regex(/^[A-Z0-9_]+$/, "Solo mayúsculas, números y guiones bajos"),
@@ -249,16 +250,17 @@ export default function RolesPage() {
                     <span className="bg-[#ccfbf1] text-[#115e59] px-2 py-1 rounded-full text-xs font-bold">{role.estado}</span>
                   </td>
                   <td className="px-6 py-4 text-right space-x-2">
+                    <AuditDetails data={role} title="Auditoría de Rol" />
                     <button
                       onClick={() => openPermModal(role)}
-                      className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-container)] rounded transition-colors"
+                      className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-container)] rounded transition-colors inline-flex items-center justify-center"
                       title="Gestionar permisos (usuarios, módulos, menús)"
                     >
                       <Settings size={18} />
                     </button>
                     <button
                       onClick={() => handleDelete(role.id)}
-                      className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-error)] hover:bg-[var(--color-error-container)] rounded transition-colors"
+                      className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-error)] hover:bg-[var(--color-error-container)] rounded transition-colors inline-flex items-center justify-center"
                       title="Eliminar"
                     >
                       <Trash2 size={18} />

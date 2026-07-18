@@ -8,6 +8,7 @@ import { MenusService, Menu } from '@/services/menus.service';
 import { ModulesService, Module } from '@/services/modules.service';
 import { Menu as MenuIcon, Plus, Trash2, Edit, ChevronRight } from 'lucide-react';
 import { IconPicker, ALL_ICONS } from '@/components/ui/IconPicker';
+import { AuditDetails } from '@/components/ui/AuditDetails';
 
 const menuSchema = z.object({
   texto: z.string().min(2, "Mínimo 2 caracteres"),
@@ -83,10 +84,11 @@ function MenuRow({ menu, depth, onDelete, onEdit, moduleName }: {
           <span className="bg-[#ccfbf1] text-[#115e59] px-2 py-1 rounded-full text-xs font-bold">{menu.estado}</span>
         </td>
         <td className="px-6 py-4 text-right space-x-1">
-          <button onClick={() => onEdit(menu)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-container)] rounded transition-colors" title="Editar">
+          <AuditDetails data={menu} title="Auditoría de Menú" />
+          <button onClick={() => onEdit(menu)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-container)] rounded transition-colors inline-flex items-center justify-center" title="Editar">
             <Edit size={16} />
           </button>
-          <button onClick={() => onDelete(menu.id)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-error)] hover:bg-[var(--color-error-container)] rounded transition-colors" title="Eliminar">
+          <button onClick={() => onDelete(menu.id)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-error)] hover:bg-[var(--color-error-container)] rounded transition-colors inline-flex items-center justify-center" title="Eliminar">
             <Trash2 size={16} />
           </button>
         </td>

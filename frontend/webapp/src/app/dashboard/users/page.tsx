@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { UsersService, User } from '@/services/users.service';
 import { RolesService, Role } from '@/services/roles.service';
 import { Users, Plus, Trash2, Edit, Shield, X, Check } from 'lucide-react';
+import { AuditDetails } from '@/components/ui/AuditDetails';
 
 const userSchema = z.object({
   id: z.string().optional(),
@@ -259,13 +260,14 @@ export default function UsersPage() {
                     }
                   </td>
                   <td className="px-6 py-4 text-right space-x-1">
-                    <button onClick={() => openRolesModal(user)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-secondary)] hover:bg-[var(--color-secondary-container)] rounded transition-colors" title="Asignar roles">
+                    <AuditDetails data={user} title="Auditoría de Usuario" />
+                    <button onClick={() => openRolesModal(user)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-secondary)] hover:bg-[var(--color-secondary-container)] rounded transition-colors inline-flex items-center justify-center" title="Asignar roles">
                       <Shield size={18} />
                     </button>
-                    <button onClick={() => openEditModal(user)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-container)] rounded transition-colors" title="Editar">
+                    <button onClick={() => openEditModal(user)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-container)] rounded transition-colors inline-flex items-center justify-center" title="Editar">
                       <Edit size={18} />
                     </button>
-                    <button onClick={() => handleDelete(user.id)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-error)] hover:bg-[var(--color-error-container)] rounded transition-colors" title="Eliminar/Inactivar">
+                    <button onClick={() => handleDelete(user.id)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-error)] hover:bg-[var(--color-error-container)] rounded transition-colors inline-flex items-center justify-center" title="Eliminar/Inactivar">
                       <Trash2 size={18} />
                     </button>
                   </td>
