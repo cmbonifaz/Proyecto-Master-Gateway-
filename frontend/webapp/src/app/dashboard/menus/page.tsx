@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { MenusService, Menu } from '@/services/menus.service';
 import { ModulesService, Module } from '@/services/modules.service';
 import { Menu as MenuIcon, Plus, Trash2, Edit, ChevronRight } from 'lucide-react';
+import { IconPicker, ALL_ICONS } from '@/components/ui/IconPicker';
 
 const menuSchema = z.object({
   texto: z.string().min(2, "Mínimo 2 caracteres"),
@@ -34,11 +35,24 @@ function buildTree(items: Menu[]): (Menu & { children: Menu[] })[] {
   return roots;
 }
 
-function MenuRow({ menu, depth, onDelete, onEdit }: {
+function renderIconPreview(iconName: string | undefined | null) {
+  if (!iconName) return null;
+  const IconCmp = ALL_ICONS[iconName];
+  if (!IconCmp) return <code className="bg-[var(--color-surface-container-low)] px-1 rounded text-xs">{iconName}</code>;
+  return (
+    <span className="inline-flex items-center gap-1">
+      <IconCmp size={14} className="text-[var(--color-primary)]" />
+      <code className="bg-[var(--color-surface-container-low)] px-1 rounded text-xs">{iconName}</code>
+    </span>
+  );
+}
+
+function MenuRow({ menu, depth, onDelete, onEdit, moduleName }: {
   menu: Menu & { children: Menu[] };
   depth: number;
   onDelete: (id: string) => void;
   onEdit: (menu: Menu) => void;
+  moduleName?: string;
 }) {
   return (
     <>
@@ -55,8 +69,15 @@ function MenuRow({ menu, depth, onDelete, onEdit }: {
         <td className="px-6 py-4 text-body-md text-[var(--color-on-surface)] font-mono">{menu.url || <span className="text-[var(--color-on-surface-variant)] italic">Sin ruta (contenedor)</span>}</td>
         <td className="px-6 py-4 text-body-sm text-[var(--color-on-surface-variant)]">
           {menu.orden && <span className="mr-2">Orden: {menu.orden}</span>}
-          {menu.icono && <code className="bg-[var(--color-surface-container-low)] px-1 rounded text-xs">{menu.icono}</code>}
+          {renderIconPreview(menu.icono)}
           {!menu.orden && !menu.icono && <span className="italic">N/A</span>}
+        </td>
+        <td className="px-6 py-4">
+          {moduleName && (
+            <span className="bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)] px-2 py-1 rounded-full text-xs font-medium">
+              {moduleName}
+            </span>
+          )}
         </td>
         <td className="px-6 py-4">
           <span className="bg-[#ccfbf1] text-[#115e59] px-2 py-1 rounded-full text-xs font-bold">{menu.estado}</span>
@@ -71,7 +92,7 @@ function MenuRow({ menu, depth, onDelete, onEdit }: {
         </td>
       </tr>
       {menu.children.map(child => (
-        <MenuRow key={child.id} menu={child as Menu & { children: Menu[] }} depth={depth + 1} onDelete={onDelete} onEdit={onEdit} />
+        <MenuRow key={child.id} menu={child as Menu & { children: Menu[] }} depth={depth + 1} onDelete={onDelete} onEdit={onEdit} moduleName={moduleName} />
       ))}
     </>
   );
@@ -85,9 +106,15 @@ export default function MenusPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMenu, setEditingMenu] = useState<Menu | null>(null);
 
-  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<MenuFormValues>({
+  // Track selected module in the form to filter parent menus
+  const [formModuleId, setFormModuleId] = useState('');
+
+  const { register, handleSubmit, reset, setValue, watch, control, formState: { errors, isSubmitting } } = useForm<MenuFormValues>({
     resolver: zodResolver(menuSchema),
   });
+
+  // Watch modulo_id to filter parent options
+  const watchedModuleId = watch('modulo_id', '');
 
   const fetchData = async () => {
     setLoading(true);
@@ -120,7 +147,7 @@ export default function MenusPage() {
     setValue('icono', menu.icono || '');
     setValue('orden', menu.orden || '');
     setValue('parent_id', menu.parent_id || '');
-    // @ts-ignore (modulo_id exists now)
+    // @ts-ignore
     setValue('modulo_id', menu.modulo_id || '');
     setIsModalOpen(true);
   };
@@ -159,7 +186,22 @@ export default function MenusPage() {
     }
   };
 
+  // Filter parent candidates: only root menus (no parent_id) that belong to the same module
+  const parentCandidates = menus.filter(m => {
+    if (editingMenu && m.id === editingMenu.id) return false; // no self
+    if (!m.parent_id) { // only root menus as parents
+      if (watchedModuleId) {
+        // @ts-ignore
+        return m.modulo_id === watchedModuleId;
+      }
+      return true;
+    }
+    return false;
+  });
+
   const tree = buildTree(menus);
+
+  const moduleMap = Object.fromEntries(modules.map(m => [m.id, m.nombre]));
 
   return (
     <div className="space-y-6">
@@ -193,18 +235,20 @@ export default function MenusPage() {
               <th className="px-6 py-3 text-label-md text-[var(--color-on-surface-variant)] uppercase">Texto / Jerarquía</th>
               <th className="px-6 py-3 text-label-md text-[var(--color-on-surface-variant)] uppercase">URL / Ruta</th>
               <th className="px-6 py-3 text-label-md text-[var(--color-on-surface-variant)] uppercase">Orden / Ícono</th>
+              <th className="px-6 py-3 text-label-md text-[var(--color-on-surface-variant)] uppercase">Módulo</th>
               <th className="px-6 py-3 text-label-md text-[var(--color-on-surface-variant)] uppercase">Estado</th>
               <th className="px-6 py-3 text-label-md text-[var(--color-on-surface-variant)] uppercase text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--color-outline-variant)]">
             {loading ? (
-              <tr><td colSpan={5} className="px-6 py-8 text-center text-[var(--color-on-surface-variant)]">Cargando...</td></tr>
+              <tr><td colSpan={6} className="px-6 py-8 text-center text-[var(--color-on-surface-variant)]">Cargando...</td></tr>
             ) : tree.length === 0 ? (
-              <tr><td colSpan={5} className="px-6 py-8 text-center text-[var(--color-on-surface-variant)]">No se encontraron menús</td></tr>
+              <tr><td colSpan={6} className="px-6 py-8 text-center text-[var(--color-on-surface-variant)]">No se encontraron menús</td></tr>
             ) : (
               tree.map(menu => (
-                <MenuRow key={menu.id} menu={menu} depth={0} onDelete={handleDelete} onEdit={openEditModal} />
+                // @ts-ignore
+                <MenuRow key={menu.id} menu={menu} depth={0} onDelete={handleDelete} onEdit={openEditModal} moduleName={moduleMap[menu.modulo_id] || undefined} />
               ))
             )}
           </tbody>
@@ -213,12 +257,13 @@ export default function MenusPage() {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-elevation-2 w-full max-w-md border border-[var(--color-outline-variant)]">
-            <div className="px-6 py-4 border-b border-[var(--color-outline-variant)] flex justify-between items-center">
+          <div className="bg-white rounded-lg shadow-elevation-2 w-full max-w-lg border border-[var(--color-outline-variant)] max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-[var(--color-outline-variant)] flex justify-between items-center sticky top-0 bg-white z-10">
               <h2 className="text-headline-sm text-[var(--color-on-surface)]">{editingMenu ? 'Editar Menú' : 'Crear Nuevo Menú'}</h2>
-              <button onClick={() => { setIsModalOpen(false); setEditingMenu(null); }} className="text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)]">&times;</button>
+              <button onClick={() => { setIsModalOpen(false); setEditingMenu(null); }} className="text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)] text-xl">&times;</button>
             </div>
             <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+              {/* Texto */}
               <div>
                 <label className="block text-label-md text-[var(--color-on-surface)] mb-1">TEXTO A MOSTRAR *</label>
                 <input
@@ -229,6 +274,7 @@ export default function MenusPage() {
                 {errors.texto && <p className="text-[var(--color-error)] text-body-sm mt-1">{errors.texto.message}</p>}
               </div>
 
+              {/* Módulo */}
               <div>
                 <label className="block text-label-md text-[var(--color-on-surface)] mb-1">MÓDULO AL QUE PERTENECE *</label>
                 <select
@@ -243,21 +289,33 @@ export default function MenusPage() {
                 {errors.modulo_id && <p className="text-[var(--color-error)] text-body-sm mt-1">{errors.modulo_id.message}</p>}
               </div>
 
+              {/* Menú padre (filtrado por módulo) */}
               <div>
-                <label className="block text-label-md text-[var(--color-on-surface)] mb-1">MENÚ PADRE (OPCIONAL)</label>
+                <label className="block text-label-md text-[var(--color-on-surface)] mb-1">
+                  MENÚ PADRE (OPCIONAL)
+                  {watchedModuleId && (
+                    <span className="ml-2 text-[10px] font-normal text-[var(--color-primary)] bg-[var(--color-primary-container)] px-1.5 py-0.5 rounded-full">
+                      Filtrado por módulo
+                    </span>
+                  )}
+                </label>
                 <select
                   {...register('parent_id')}
                   className="w-full px-3 py-2 border border-[var(--color-outline-variant)] rounded text-body-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] bg-white"
                 >
                   <option value="">— Ninguno (menú raíz del módulo) —</option>
-                  {menus
-                    .filter(m => !editingMenu || m.id !== editingMenu.id)
-                    .map(m => (
-                      <option key={m.id} value={m.id}>{m.parent_id ? `  ↳ ${m.texto}` : m.texto}</option>
-                    ))}
+                  {parentCandidates.map(m => (
+                    <option key={m.id} value={m.id}>{m.texto}</option>
+                  ))}
                 </select>
+                {parentCandidates.length === 0 && watchedModuleId && (
+                  <p className="text-body-sm text-[var(--color-on-surface-variant)] mt-1 italic">
+                    No hay menús raíz en este módulo aún. Este menú será el primero.
+                  </p>
+                )}
               </div>
 
+              {/* URL */}
               <div>
                 <label className="block text-label-md text-[var(--color-on-surface)] mb-1">URL / RUTA (OPCIONAL)</label>
                 <input
@@ -265,28 +323,37 @@ export default function MenusPage() {
                   className="w-full px-3 py-2 border border-[var(--color-outline-variant)] rounded text-body-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                   placeholder="Ej: /dashboard/pagos"
                 />
+                <p className="text-body-sm text-[var(--color-on-surface-variant)] mt-1">
+                  Si es un contenedor de submenús, deja este campo vacío.
+                </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-label-md text-[var(--color-on-surface)] mb-1">ÍCONO (OPCIONAL)</label>
-                  <input
-                    {...register('icono')}
-                    className="w-full px-3 py-2 border border-[var(--color-outline-variant)] rounded text-body-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    placeholder="Ej: Shield"
-                  />
-                </div>
-                <div>
-                  <label className="block text-label-md text-[var(--color-on-surface)] mb-1">ORDEN (OPCIONAL)</label>
-                  <input
-                    {...register('orden')}
-                    className="w-full px-3 py-2 border border-[var(--color-outline-variant)] rounded text-body-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    placeholder="Ej: 001"
-                  />
-                </div>
+              {/* Ícono con visual picker */}
+              <div>
+                <label className="block text-label-md text-[var(--color-on-surface)] mb-1">ÍCONO (OPCIONAL)</label>
+                <Controller
+                  name="icono"
+                  control={control}
+                  render={({ field }) => (
+                    <IconPicker
+                      value={field.value || ''}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
               </div>
 
-              <div className="flex justify-end gap-3 mt-6">
+              {/* Orden */}
+              <div>
+                <label className="block text-label-md text-[var(--color-on-surface)] mb-1">ORDEN (OPCIONAL)</label>
+                <input
+                  {...register('orden')}
+                  className="w-full px-3 py-2 border border-[var(--color-outline-variant)] rounded text-body-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  placeholder="Ej: 001, 002 (ordena los ítems en el menú)"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[var(--color-outline-variant)]">
                 <button type="button" onClick={() => { setIsModalOpen(false); setEditingMenu(null); }}
                   className="px-4 py-2 border border-[var(--color-outline-variant)] text-[var(--color-on-surface)] rounded hover:bg-[var(--color-surface-container-low)]">
                   Cancelar

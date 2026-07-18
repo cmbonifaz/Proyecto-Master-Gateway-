@@ -78,7 +78,7 @@ async def get_role_permissions(
         .where(Module.estado == "ACTIVO")
     )
     modules_result = await db.execute(stmt_modules)
-    modules = [{"id": m.id, "nombre": m.nombre} for m in modules_result.scalars().all()]
+    modules = [{"id": m.id, "nombre": m.nombre, "descripcion": m.descripcion} for m in modules_result.scalars().all()]
 
     # Menús asignados
     stmt_menus = (

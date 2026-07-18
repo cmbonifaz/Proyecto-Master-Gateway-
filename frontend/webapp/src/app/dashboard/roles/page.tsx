@@ -8,7 +8,8 @@ import { RolesService, Role } from '@/services/roles.service';
 import { UsersService, User } from '@/services/users.service';
 import { ModulesService, Module } from '@/services/modules.service';
 import { MenusService, Menu } from '@/services/menus.service';
-import { Shield, Plus, Trash2, Settings, Users, Layers, Menu as MenuIcon, X, Check } from 'lucide-react';
+import { Shield, Plus, Trash2, Settings, Users, Layers, Menu as MenuIcon, X, Check, Filter } from 'lucide-react';
+import { ALL_ICONS } from '@/components/ui/IconPicker';
 
 const roleSchema = z.object({
   nombre: z.string().min(3, "Mínimo 3 caracteres").regex(/^[A-Z0-9_]+$/, "Solo mayúsculas, números y guiones bajos"),
@@ -24,7 +25,14 @@ interface RoleWithRelations extends Role {
   menus?: Menu[];
 }
 
-function ToggleChip({ label, active, onToggle, loading }: { label: string; active: boolean; onToggle: () => void; loading?: boolean }) {
+function ToggleChip({ label, active, onToggle, loading, icon }: {
+  label: string;
+  active: boolean;
+  onToggle: () => void;
+  loading?: boolean;
+  icon?: string;
+}) {
+  const IconCmp = icon ? ALL_ICONS[icon] : null;
   return (
     <button
       type="button"
@@ -36,7 +44,7 @@ function ToggleChip({ label, active, onToggle, loading }: { label: string; activ
           : 'bg-white text-[var(--color-on-surface)] border-[var(--color-outline-variant)] hover:bg-[var(--color-surface-container-low)]'
       } ${loading ? 'opacity-50 cursor-wait' : ''}`}
     >
-      {active ? <Check size={14} /> : <Plus size={14} />}
+      {IconCmp ? <IconCmp size={14} /> : (active ? <Check size={14} /> : <Plus size={14} />)}
       {label}
     </button>
   );
@@ -53,6 +61,9 @@ export default function RolesPage() {
   const [allModules, setAllModules] = useState<Module[]>([]);
   const [allMenus, setAllMenus] = useState<Menu[]>([]);
   const [toggling, setToggling] = useState<string | null>(null);
+
+  // Filter menus by module in the permissions panel
+  const [menuFilterModuleId, setMenuFilterModuleId] = useState<string>('');
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<RoleFormValues>({
     resolver: zodResolver(roleSchema),
@@ -75,6 +86,7 @@ export default function RolesPage() {
   const openPermModal = async (role: Role) => {
     setPermRole(role);
     setPermTab('users');
+    setMenuFilterModuleId('');
     try {
       const [users, modules, menus, permissions] = await Promise.all([
         UsersService.getUsers(),
@@ -172,6 +184,15 @@ export default function RolesPage() {
       alert(e.response?.data?.detail || 'Error eliminando rol');
     }
   };
+
+  // Menus filtered by selected module (or all if no filter)
+  const filteredMenus = menuFilterModuleId
+    ? allMenus.filter((m: any) => m.modulo_id === menuFilterModuleId)
+    : allMenus;
+
+  // Group menus by their parent status
+  const rootMenus = filteredMenus.filter(m => !m.parent_id);
+  const childMenus = filteredMenus.filter(m => !!m.parent_id);
 
   const tabs: { key: PermTab; label: string; icon: React.ElementType }[] = [
     { key: 'users', label: 'Usuarios', icon: Users },
@@ -299,7 +320,7 @@ export default function RolesPage() {
       {/* ── Modal Gestión de Permisos ── */}
       {permRole && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-elevation-2 w-full max-w-2xl border border-[var(--color-outline-variant)] max-h-[85vh] flex flex-col">
+          <div className="bg-white rounded-lg shadow-elevation-2 w-full max-w-2xl border border-[var(--color-outline-variant)] max-h-[90vh] flex flex-col">
             {/* Header */}
             <div className="px-6 py-4 border-b border-[var(--color-outline-variant)] flex justify-between items-center flex-shrink-0">
               <div>
@@ -360,6 +381,7 @@ export default function RolesPage() {
                 <div>
                   <p className="text-body-sm text-[var(--color-on-surface-variant)] mb-4">
                     Selecciona los módulos accesibles para el rol <strong>{permRole.nombre}</strong>.
+                    Los menús se filtrarán automáticamente según los módulos activos cuando vayas a la pestaña de Menús.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {allModules.length === 0 && <p className="text-body-sm text-[var(--color-on-surface-variant)] italic">No hay módulos disponibles.</p>}
@@ -378,21 +400,82 @@ export default function RolesPage() {
 
               {permTab === 'menus' && (
                 <div>
-                  <p className="text-body-sm text-[var(--color-on-surface-variant)] mb-4">
+                  <p className="text-body-sm text-[var(--color-on-surface-variant)] mb-3">
                     Selecciona los ítems de menú visibles para el rol <strong>{permRole.nombre}</strong>.
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {allMenus.length === 0 && <p className="text-body-sm text-[var(--color-on-surface-variant)] italic">No hay menús disponibles.</p>}
-                    {allMenus.map(menu => (
-                      <ToggleChip
-                        key={menu.id}
-                        label={menu.parent_id ? `↳ ${menu.texto}` : menu.texto}
-                        active={isMenuAssigned(menu.id)}
-                        onToggle={() => toggleMenu(menu.id)}
-                        loading={toggling === menu.id}
-                      />
-                    ))}
+
+                  {/* Module filter selector */}
+                  <div className="flex items-center gap-2 mb-4 p-3 bg-[var(--color-surface-container-low)] rounded-lg">
+                    <Filter size={16} className="text-[var(--color-on-surface-variant)] flex-shrink-0" />
+                    <label className="text-body-sm text-[var(--color-on-surface-variant)] flex-shrink-0">Filtrar por módulo:</label>
+                    <select
+                      value={menuFilterModuleId}
+                      onChange={e => setMenuFilterModuleId(e.target.value)}
+                      className="flex-1 px-2 py-1.5 border border-[var(--color-outline-variant)] rounded text-body-sm bg-white focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                    >
+                      <option value="">— Todos los módulos —</option>
+                      {allModules.map(m => (
+                        <option key={m.id} value={m.id}>{m.nombre}</option>
+                      ))}
+                    </select>
+                    {menuFilterModuleId && (
+                      <button
+                        onClick={() => setMenuFilterModuleId('')}
+                        className="p-1 rounded hover:bg-[var(--color-surface-container)] text-[var(--color-on-surface-variant)]"
+                        title="Limpiar filtro"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
                   </div>
+
+                  {filteredMenus.length === 0 ? (
+                    <p className="text-body-sm text-[var(--color-on-surface-variant)] italic py-4 text-center">
+                      {menuFilterModuleId
+                        ? 'No hay menús en el módulo seleccionado. Crea menús primero en Gestión de Menús.'
+                        : 'No hay menús disponibles.'
+                      }
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Root menus first */}
+                      {rootMenus.length > 0 && (
+                        <div>
+                          <p className="text-label-md text-[var(--color-on-surface-variant)] uppercase tracking-wider mb-2">Menús principales</p>
+                          <div className="flex flex-wrap gap-2">
+                            {rootMenus.map(menu => (
+                              <ToggleChip
+                                key={menu.id}
+                                label={menu.texto}
+                                active={isMenuAssigned(menu.id)}
+                                onToggle={() => toggleMenu(menu.id)}
+                                loading={toggling === menu.id}
+                                icon={menu.icono || undefined}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {/* Child menus */}
+                      {childMenus.length > 0 && (
+                        <div>
+                          <p className="text-label-md text-[var(--color-on-surface-variant)] uppercase tracking-wider mb-2">Sub-ítems</p>
+                          <div className="flex flex-wrap gap-2">
+                            {childMenus.map(menu => (
+                              <ToggleChip
+                                key={menu.id}
+                                label={`↳ ${menu.texto}`}
+                                active={isMenuAssigned(menu.id)}
+                                onToggle={() => toggleMenu(menu.id)}
+                                loading={toggling === menu.id}
+                                icon={menu.icono || undefined}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
