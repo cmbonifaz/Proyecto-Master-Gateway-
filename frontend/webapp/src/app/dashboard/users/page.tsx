@@ -303,7 +303,7 @@ export default function UsersPage() {
                 <label className="block text-label-md text-[var(--color-on-surface)] mb-1">CORREO ELECTRÓNICO *</label>
                 <input type="email" {...register('email')}
                   className={`w-full px-3 py-2 border rounded text-body-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${errors.email ? 'border-[var(--color-error)]' : 'border-[var(--color-outline-variant)]'}`}
-                  placeholder="juan@gateway.local" />
+                  placeholder="juan@gateway.com" />
                 {errors.email && <p className="text-[var(--color-error)] text-body-sm mt-1">{errors.email.message}</p>}
               </div>
               <div>

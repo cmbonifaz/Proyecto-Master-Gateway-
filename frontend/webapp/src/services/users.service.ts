@@ -10,12 +10,12 @@ export interface User {
 
 export const UsersService = {
   getUsers: async () => {
-    const { data } = await apiAuth.get('/api/users/');
+    const { data } = await apiAuth.get('/api/users');
     return data;
   },
 
   createUser: async (payload: { email: string; password?: string; nombre: string }) => {
-    const { data } = await apiAuth.post('/api/users/', payload);
+    const { data } = await apiAuth.post('/api/users', payload);
     return data;
   },
 

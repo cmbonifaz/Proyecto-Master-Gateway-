@@ -32,6 +32,15 @@ class UserService:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_any_by_email(db: AsyncSession, email: str) -> Optional[User]:
+        """
+        Busca un usuario por su correo electrónico (activo o inactivo).
+        """
+        stmt = select(User).where(User.email == email)
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def list_active(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[User]:
         """
         Lista usuarios activos paginados.
@@ -54,8 +63,12 @@ class UserService:
         )
         db.add(db_obj)
         await db.flush()
-        await db.refresh(db_obj)
-        return db_obj
+        
+        # Consultamos el usuario de nuevo para que se cargue la relación 'roles' (lazy="selectin")
+        # y evitar un error de greenlet al serializar.
+        stmt = select(User).where(User.id == db_obj.id)
+        result = await db.execute(stmt)
+        return result.scalar_one()
 
     @staticmethod
     async def update(db: AsyncSession, db_obj: User, obj_in: UserUpdate, updater_id: Optional[str] = None) -> User:
@@ -72,8 +85,11 @@ class UserService:
         db_obj.actualizado_por = updater_id
         db.add(db_obj)
         await db.flush()
-        await db.refresh(db_obj)
-        return db_obj
+        
+        # Consultamos el usuario de nuevo para recargar la relación y evitar que quede expirada tras el flush.
+        stmt = select(User).where(User.id == db_obj.id)
+        result = await db.execute(stmt)
+        return result.scalar_one()
 
     @staticmethod
     async def delete(db: AsyncSession, db_obj: User, updater_id: Optional[str] = None) -> User:

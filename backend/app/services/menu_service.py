@@ -32,6 +32,7 @@ class MenuService:
             icono=obj_in.icono,
             orden=obj_in.orden,
             parent_id=obj_in.parent_id,
+            modulo_id=obj_in.modulo_id,
             creado_por=creator_id,
             actualizado_por=creator_id
         )
@@ -55,6 +56,9 @@ class MenuService:
             if obj_in.parent_id == db_obj.id:
                 raise ValueError("Un menú no puede ser su propio padre.")
             db_obj.parent_id = obj_in.parent_id
+            
+        if obj_in.modulo_id is not None:
+            db_obj.modulo_id = obj_in.modulo_id
             
         db_obj.actualizado_por = updater_id
         db.add(db_obj)

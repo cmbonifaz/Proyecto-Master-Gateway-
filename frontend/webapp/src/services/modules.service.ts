@@ -9,7 +9,7 @@ export interface Module {
 
 export const ModulesService = {
   getModules: async () => {
-    const { data } = await apiAuth.get('/api/modules/');
+    const { data } = await apiAuth.get('/api/modules');
     return data;
   },
 
@@ -19,7 +19,7 @@ export const ModulesService = {
   },
 
   createModule: async (payload: { nombre: string; descripcion?: string }) => {
-    const { data } = await apiAuth.post('/api/modules/', payload);
+    const { data } = await apiAuth.post('/api/modules', payload);
     return data;
   },
 

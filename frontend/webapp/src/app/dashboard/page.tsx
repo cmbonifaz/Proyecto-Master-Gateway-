@@ -24,7 +24,7 @@ const MODULE_ICONS = [Layers, Package, BarChart2, UserCheck, ShieldCheck, Server
 
 export default function DashboardPage() {
   const { currentRole, roles } = useAuth();
-  const [stats, setStats] = useState({ roles: 0, users: 0, activeServices: 4 });
+  const [stats, setStats] = useState({ roles: 0, users: 0, activeServices: 0 });
   const [userModules, setUserModules] = useState<Module[]>([]);
   const [loadingModules, setLoadingModules] = useState(true);
   const activeRoleName = roles.find(r => r.id === currentRole)?.nombre || '';
@@ -34,14 +34,17 @@ export default function DashboardPage() {
     if (isAdmin) {
       const fetchStats = async () => {
         try {
-          const [rolesData, usersData] = await Promise.all([
+          const { ModulesService } = await import('@/services/modules.service');
+          const [rolesData, usersData, modulesData] = await Promise.all([
             RolesService.getRoles(),
-            UsersService.getUsers()
+            UsersService.getUsers(),
+            ModulesService.getModules()
           ]);
           setStats(prev => ({
             ...prev,
             roles: rolesData.length,
-            users: usersData.length
+            users: usersData.length,
+            activeServices: modulesData.length
           }));
         } catch (e) {
           console.error("Failed to load dashboard stats", e);
@@ -179,10 +182,10 @@ export default function DashboardPage() {
         <div className="bg-white p-6 rounded-lg shadow-elevation-1 hover:shadow-elevation-2 transition-shadow border border-[var(--color-outline-variant)]">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-[var(--color-tertiary-fixed)] text-[var(--color-on-tertiary-fixed)] rounded flex items-center justify-center">
-              <Server size={24} />
+              <Layers size={24} />
             </div>
             <div>
-              <p className="text-label-md text-[var(--color-on-surface-variant)] uppercase">Servicios Activos</p>
+              <p className="text-label-md text-[var(--color-on-surface-variant)] uppercase">Módulos Activos</p>
               <h2 className="text-headline-lg text-[var(--color-on-surface)] mt-1">{stats.activeServices}</h2>
             </div>
           </div>

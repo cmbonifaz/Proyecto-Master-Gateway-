@@ -12,7 +12,7 @@ export interface Menu {
 
 export const MenusService = {
   getMenus: async () => {
-    const { data } = await apiAuth.get('/api/menus/');
+    const { data } = await apiAuth.get('/api/menus');
     return data;
   },
 
@@ -21,8 +21,8 @@ export const MenusService = {
     return data;
   },
 
-  createMenu: async (payload: { texto: string; url?: string; icono?: string; orden?: string; parent_id?: string }) => {
-    const { data } = await apiAuth.post('/api/menus/', payload);
+  createMenu: async (payload: { texto: string; url?: string; icono?: string; orden?: string; parent_id?: string; modulo_id: string }) => {
+    const { data } = await apiAuth.post('/api/menus', payload);
     return data;
   },
 

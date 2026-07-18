@@ -9,7 +9,7 @@ export interface Role {
 
 export const RolesService = {
   getRoles: async () => {
-    const { data } = await apiAuth.get('/api/roles/');
+    const { data } = await apiAuth.get('/api/roles');
     return data;
   },
 
@@ -24,7 +24,7 @@ export const RolesService = {
   },
 
   createRole: async (payload: { nombre: string; descripcion?: string }) => {
-    const { data } = await apiAuth.post('/api/roles/', payload);
+    const { data } = await apiAuth.post('/api/roles', payload);
     return data;
   },
 
