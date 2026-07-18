@@ -13,6 +13,11 @@ export const ModulesService = {
     return data;
   },
 
+  getModuleById: async (id: string) => {
+    const { data } = await apiAuth.get(`/api/modules/${id}`);
+    return data;
+  },
+
   createModule: async (payload: { nombre: string; descripcion?: string }) => {
     const { data } = await apiAuth.post('/api/modules/', payload);
     return data;
