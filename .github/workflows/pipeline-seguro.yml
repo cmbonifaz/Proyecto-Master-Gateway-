@@ -19,7 +19,7 @@ jobs:
   # Corre en los servidores de GitHub — no necesita acceso a red local
   # ==============================================================================
   gatekeeper-security-check:
-    name: "🤖 Análisis de Seguridad ML (Gatekeeper)"
+    name: "Análisis de Seguridad ML (Gatekeeper)"
     runs-on: ubuntu-latest
     env:
       # Token necesario para autenticar la CLI de GitHub
@@ -60,12 +60,20 @@ jobs:
       # ── NOTIFICAR RESUMEN DE ANÁLISIS ML A TELEGRAM ──
       - name: Notificar resumen de análisis ML a Telegram
         if: always() && !cancelled()
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          if [ -f telegram_resumen.txt ]; then
-            curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
-              -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-              -d text="$(cat telegram_resumen.txt)"
-          fi
+          python -c "
+          import os, urllib.request, urllib.parse
+          token = os.environ.get('TELEGRAM_TOKEN')
+          chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+          if os.path.exists('telegram_resumen.txt'):
+              with open('telegram_resumen.txt', 'r', encoding='utf-8') as f:
+                  text = f.read()
+              data = urllib.parse.urlencode({'chat_id': chat_id, 'text': text}).encode('utf-8')
+              urllib.request.urlopen(f'https://api.telegram.org/bot{token}/sendMessage', data=data)
+          "
 
       # ── MANEJO DE FALLO (SE DETECTÓ CÓDIGO VULNERABLE) ──
       - name: Acciones correctivas ante código VULNERABLE
@@ -111,7 +119,7 @@ jobs:
   # ya que el runner es Windows y el 'curl' nativo de Linux no está disponible.
   # ==============================================================================
   sonarqube-analysis:
-    name: "🔍 Análisis SAST SonarQube Community"
+    name: "Análisis SAST SonarQube Community"
     needs: gatekeeper-security-check
     runs-on: self-hosted
 
@@ -318,7 +326,7 @@ Commit: https://github.com/$env:GITHUB_REPOSITORY/commit/$env:GITHUB_SHA
   # Corre después del Gatekeeper ML Y del SonarQube (ambos deben pasar)
   # ==============================================================================
   auto-merge-and-test:
-    name: "🧪 Merge a Test y Pytest"
+    name: "Merge a Test y Pytest"
     needs: [gatekeeper-security-check, sonarqube-analysis]
     runs-on: ubuntu-latest
     env:
@@ -418,7 +426,7 @@ Commit: ${SHA}
   # No hay despliegue a Render — el merge a main es el paso final.
   # ==============================================================================
   promote-to-main:
-    name: "🚀 Promoción a Main"
+    name: "Promoción a Main"
     needs: auto-merge-and-test
     runs-on: ubuntu-latest
     env:
