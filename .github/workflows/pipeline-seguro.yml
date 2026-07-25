@@ -52,8 +52,20 @@ jobs:
           echo "Diff extraído correctamente."
 
       - name: Ejecutar Análisis de Seguridad (Inferencia ML)
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           python scripts/analizador_ci.py cambios.diff
+
+      # ── NOTIFICAR RESUMEN DE ANÁLISIS ML A TELEGRAM ──
+      - name: Notificar resumen de análisis ML a Telegram
+        if: always() && !cancelled()
+        run: |
+          if [ -f telegram_resumen.txt ]; then
+            curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
+              -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+              -d text="$(cat telegram_resumen.txt)"
+          fi
 
       # ── MANEJO DE FALLO (SE DETECTÓ CÓDIGO VULNERABLE) ──
       - name: Acciones correctivas ante código VULNERABLE
@@ -170,6 +182,14 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           $headers = @{ Authorization = "Bearer $env:SONAR_TOKEN" }
           $serverUrl = $env:SONAR_HOST_URL
@@ -204,6 +224,60 @@ jobs:
           $qg = Invoke-RestMethod -Uri "$serverUrl/api/qualitygates/project_status?analysisId=$analysisId" -Headers $headers
           $qgStatus = $qg.projectStatus.status
           Write-Host "Quality Gate: $qgStatus"
+
+          # Extraer métricas de forma segura
+          $secIssues = ($qg.projectStatus.conditions | Where-Object { $_.metricKey -eq "software_quality_security_issues" }).actualValue
+          if (-not $secIssues) { $secIssues = "0" }
+
+          $relIssues = ($qg.projectStatus.conditions | Where-Object { $_.metricKey -eq "software_quality_reliability_issues" }).actualValue
+          if (-not $relIssues) { $relIssues = "0" }
+
+          $maintIssues = ($qg.projectStatus.conditions | Where-Object { $_.metricKey -eq "software_quality_maintainability_issues" }).actualValue
+          if (-not $maintIssues) { $maintIssues = "0" }
+
+          $coverageVal = ($qg.projectStatus.conditions | Where-Object { $_.metricKey -eq "coverage" }).actualValue
+          if (-not $coverageVal) { $coverageVal = "N/D" }
+
+          $duplVal = ($qg.projectStatus.conditions | Where-Object { $_.metricKey -eq "duplicated_lines_density" }).actualValue
+          if (-not $duplVal) { $duplVal = "0%" }
+
+          $shortSha = $env:GITHUB_SHA
+          if ($shortSha -and $shortSha.Length -ge 7) { $shortSha = $shortSha.Substring(0, 7) }
+
+          $summaryText = @"
+[INFORME SAST - SONARQUBE COMMUNITY]
+Informe automatico generado por SonarQube v26.6
+
+------------------------------------
+RESUMEN DEL EVENTO
+Autor: $env:GITHUB_ACTOR
+PR: #$env:PR_NUMBER ($env:GITHUB_HEAD_REF -> $env:GITHUB_BASE_REF)
+Commit: $shortSha
+Quality Gate: $qgStatus
+
+------------------------------------
+METRICAS EVALUADAS
+Security Issues: $secIssues (Max: 0)
+Reliability Issues: $relIssues (Max: 5)
+Maintainability Issues: $maintIssues (Max: 15)
+Coverage: $coverageVal% (Min: 60%)
+Duplication: $duplVal% (Max: 10%)
+
+------------------------------------
+ENLACES
+Dashboard: $serverUrl/dashboard?id=Master-Gateway
+Commit: https://github.com/$env:GITHUB_REPOSITORY/commit/$env:GITHUB_SHA
+"@
+
+          # Enviar resumen del análisis a Telegram en UTF-8 sin emojis
+          $jsonSummary = @{
+              chat_id = $env:TELEGRAM_CHAT_ID
+              text = $summaryText
+          } | ConvertTo-Json
+
+          $bytesSummary = [System.Text.Encoding]::UTF8.GetBytes($jsonSummary)
+          Invoke-WebRequest -Uri "https://api.telegram.org/bot$env:TELEGRAM_TOKEN/sendMessage" `
+            -Method POST -Body $bytesSummary -ContentType "application/json; charset=utf-8" -UseBasicParsing | Out-Null
 
           if ($qgStatus -ne "OK") {
             Write-Error "FALLO: Quality Gate no superado ($qgStatus). Revisar $serverUrl/dashboard?id=Master-Gateway"
@@ -279,6 +353,39 @@ jobs:
           TEMP_TOKEN_EXPIRE_MINUTES: "5"
           ACCESS_TOKEN_EXPIRE_MINUTES: "30"
           REFRESH_TOKEN_EXPIRE_DAYS: "7"
+
+      # ── NOTIFICAR RESUMEN DE PRUEBAS PYTEST ──
+      - name: Notificar resumen de pruebas Pytest a Telegram
+        if: always() && !cancelled()
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          HEAD_REF="${{ github.head_ref }}"
+          BASE_REF="${{ github.base_ref }}"
+          SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          ACTOR="${{ github.actor }}"
+          
+          SUMMARY="🧪 RESUMEN DE PRUEBAS FUNCIONALES (PYTEST)
+Informe de Ejecución de Pruebas Unitarias
+
+━━━━━━━━━━━━━━━━━━━━
+📌 Resumen del evento
+Autor: ${ACTOR}
+PR: #${PR_NUM} (${HEAD_REF} -> ${BASE_REF})
+Commit: ${SHA}
+
+━━━━━━━━━━━━━━━━━━━━
+📊 Detalles de Ejecución
+- Entorno BD: SQLite Async (en memoria)
+- Módulos probados: Auth, Users, Roles, Menus
+- Cobertura de Código: Reporte generado (coverage.xml)
+
+━━━━━━━━━━━━━━━━━━━━
+🔗 Enlaces
+- Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="$SUMMARY"
 
       # ── MANEJO DE FALLO EN PRUEBAS ──
       - name: Notificar fallo de pruebas a Telegram
