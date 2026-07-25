@@ -124,6 +124,7 @@ backend/
 ## 📂 Fase 2 — Modelos ORM (SQLAlchemy + BaseAudit)
 
 ### `models/base.py` — Auditoría Global
+
 Todos los modelos heredan de `BaseAudit`:
 ```python
 id                  → UUID (primary key)
