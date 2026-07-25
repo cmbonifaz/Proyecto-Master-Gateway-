@@ -66,6 +66,21 @@ class Menu(BaseAudit):
         lazy="selectin",
     )
 
+    # ── Relación con Module ──────────────────────────────────────────────────
+    modulo_id = Column(
+        UUID(as_uuid=False),
+        ForeignKey("modules.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        comment="Módulo al que pertenece este menú",
+    )
+
+    modulo = relationship(
+        "Module",
+        back_populates="menus",
+        lazy="selectin",
+    )
+
     # Relación M:N con Role
     roles = relationship(
         "Role",

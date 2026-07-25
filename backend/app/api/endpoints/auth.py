@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.schemas.auth import LoginRequest, TempTokenResponse, RoleSelectRequest, TokenResponse, RefreshTokenRequest, LogoutRequest
+from app.schemas.user import UserCreate
 from app.services.auth_service import AuthService
+from app.services.user_service import UserService
 
 router = APIRouter()
 
@@ -97,3 +99,25 @@ async def logout(
     """
     await AuthService.logout(db, obj_in.refresh_token)
     return {"detail": "Sesión cerrada correctamente"}
+
+
+@router.post(
+    "/register",
+    status_code=status.HTTP_201_CREATED,
+    summary="Registro de un nuevo usuario (sin roles por defecto)"
+)
+async def register_user(
+    obj_in: UserCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Permite el autorregistro de un usuario nuevo.
+    El usuario nace sin roles y requiere que un admin se los asigne después.
+    """
+    existing = await UserService.get_by_email(db, obj_in.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="El correo electrónico ya está registrado")
+    
+    await UserService.create(db, obj_in, creator_id=None)
+    return {"detail": "Registro exitoso. Espera a que un administrador te asigne un rol."}
+

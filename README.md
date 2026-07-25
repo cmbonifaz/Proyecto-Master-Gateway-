@@ -419,68 +419,119 @@ pipeline-seguro/
 
 ### Prerrequisitos
 
-- Python 3.11+
-- Docker Desktop (para SonarQube)
-- Git + GitHub CLI (`gh`)
-- Cuenta en [Render](https://render.com)
-- Bot de Telegram creado con [@BotFather](https://t.me/BotFather)
-- SonarQube Community corriendo en `http://localhost:9000`
+- **Python 3.11+**
+- **Node.js 18+** y **npm** (para el Frontend)
+- **Docker Desktop** (opcional, necesario si quieres correr SonarQube localmente)
+- **Git**
 
-### 1. Clonar el Repositorio
+---
 
-```bash
-git clone https://github.com/<tu-usuario>/pipeline-seguro
-cd pipeline-seguro
-```
+### 🚀 Levantando el Backend
 
-### 2. Levantar SonarQube (si no está corriendo)
+1. **Clonar el repositorio:**
+   ```bash
+   git clone https://github.com/<tu-usuario>/pipeline-seguro
+   cd pipeline-seguro
+   ```
 
-```bash
-docker run -d --name sonarqube -p 9000:9000 sonarqube:community
-# Esperar ~1 minuto, luego acceder a http://localhost:9000
-# Usuario: admin / Contraseña inicial: admin
-```
+2. **Configurar el entorno virtual de Python:**
+   ```bash
+   cd backend
+   python -m venv .venv
+   
+   # Activar en Windows (PowerShell):
+   .venv\Scripts\Activate.ps1
+   # Activar en Linux/macOS:
+   source .venv/bin/activate
+   ```
 
-### 3. Configurar el Self-Hosted Runner
+3. **Instalar dependencias del Backend:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-En tu repositorio GitHub: **Settings → Actions → Runners → New self-hosted runner**  
-Seguir los pasos para Windows (PowerShell). El runner queda registrado y listo.
+4. **Configurar Variables de Entorno del Backend:**
+   Copia el archivo `.env.example` como `.env` dentro de la carpeta `backend/`:
+   ```bash
+   cp .env.example .env
+   ```
+   Abre el archivo `.env` recién creado. Para desarrollo local rápido, puedes configurar SQLite:
+   ```env
+   DATABASE_URL=sqlite+aiosqlite:///./master_auth.db
+   JWT_SECRET=tu_secreto_hexadecimal_generado_localmente
+   DEBUG=True
+   ```
+   *(Nota: Para producción, la url apuntará a PostgreSQL/Supabase en formato `postgresql+asyncpg://...`)*
 
-### 4. Configurar Variables de Entorno del Backend
+5. **Ejecutar Migraciones de Base de Datos (Alembic):**
+   ```bash
+   alembic upgrade head
+   ```
 
-```bash
-# Copiar el ejemplo
-cp backend/.env.example backend/.env
+6. **Poblar la base de datos con datos semilla de prueba:**
+   Ejecuta el script de semilla para crear los roles (`ADMIN`, `VENDEDOR`), usuarios de prueba (`admin@gateway.com`, `vendedor@gateway.com`), módulos y menús jerárquicos:
+   ```bash
+   python seed_test_data.py
+   ```
 
-# Editar con tus valores reales
-DATABASE_URL=postgresql+asyncpg://user:pass@host/db
-JWT_SECRET=tu-secreto-muy-largo-y-seguro
-```
+7. **Iniciar el servidor Backend:**
+   ```bash
+   uvicorn app.main:app --reload --port 8000
+   ```
+   *   **API local en:** `http://localhost:8000`
+   *   **Documentación Interactiva (Swagger UI):** `http://localhost:8000/docs`
 
-### 5. Instalar Dependencias y Correr Tests
+---
 
-```bash
-cd backend
-pip install -r requirements.txt
-pytest tests/ -v
-```
+### 💻 Levantando el Frontend (Next.js SPA)
 
-### 6. Levantar el Backend Localmente
+1. **Abrir una nueva terminal e ingresar a la carpeta del frontend:**
+   ```bash
+   cd frontend/webapp
+   ```
 
-```bash
-cd backend
-uvicorn app.main:app --reload --port 8000
-# API disponible en: http://localhost:8000/docs
-```
+2. **Instalar dependencias de Node.js:**
+   ```bash
+   npm install
+   ```
 
-### 7. Activar el Pipeline
+3. **Iniciar el servidor de desarrollo del Frontend:**
+   ```bash
+   npm run dev
+   ```
+   *   **Aplicación web disponible en:** `http://localhost:3000`
+   *   **Credenciales de prueba sembradas:**
+       *   **Admin:** `admin@gateway.com` / `Admin123!`
+       *   **Vendedor:** `vendedor@gateway.com` / `Vendedor123!`
 
+---
+
+### 🧪 Pruebas Unitarias y Estáticas
+
+- **Correr Tests del Backend (Pytest):**
+  ```bash
+  cd backend
+  pytest tests/ -v
+  ```
+- **Levantar SonarQube local en Docker (Opcional):**
+  ```bash
+  docker run -d --name sonarqube -p 9000:9000 sonarqube:community
+  # Accede a http://localhost:9000 (admin / admin)
+  ```
+- **Configurar el Self-Hosted Runner (para el Pipeline):**
+  En tu repositorio de GitHub ve a **Settings → Actions → Runners → New self-hosted runner** y sigue los pasos correspondientes a tu sistema operativo. El runner permitirá a GitHub Actions contactar a tu servidor local de SonarQube sin exponerlo a internet.
+
+---
+
+### 🔄 Flujo del Pipeline (Git)
+
+Para disparar el flujo completo de validaciones (ML Gatekeeper + SonarQube + Pytest + Deploy):
 ```bash
 git checkout dev
 git add .
-git commit -m "feat: nueva funcionalidad"
+git commit -m "feat: mi cambio"
 git push origin dev
-# En GitHub: crear PR de dev → test → pipeline se dispara automáticamente 🚀
+# Crea un Pull Request de 'dev' hacia 'test' en GitHub 🚀
 ```
 
 ---

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Workspace Selector | Master Gateway</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-primary": "#c0c1ff",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed": "#6ffbbe",
+                        "background": "#fcf8ff",
+                        "surface-container": "#f0ecf5",
+                        "inverse-surface": "#303036",
+                        "surface-container-low": "#f5f2fb",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "error": "#ba1a1a",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "on-secondary-container": "#54647a",
+                        "on-tertiary-container": "#22c087",
+                        "secondary": "#505f76",
+                        "primary-container": "#2e3192",
+                        "outline": "#777683",
+                        "secondary-fixed": "#d3e4fe",
+                        "on-primary-fixed": "#04006d",
+                        "on-secondary-fixed": "#0b1c30",
+                        "surface-container-highest": "#e4e1ea",
+                        "on-tertiary-fixed": "#002113",
+                        "on-surface": "#1b1b21",
+                        "tertiary": "#002f1e",
+                        "inverse-on-surface": "#f2eff8",
+                        "outline-variant": "#c7c5d4",
+                        "surface-container-lowest": "#ffffff",
+                        "primary": "#15157d",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "surface-container-high": "#eae7f0",
+                        "primary-fixed": "#e1e0ff",
+                        "on-primary": "#ffffff",
+                        "surface-variant": "#e4e1ea",
+                        "tertiary-container": "#004830",
+                        "surface-bright": "#fcf8ff",
+                        "surface-dim": "#dbd9e1",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "on-primary-container": "#9da1ff",
+                        "surface-tint": "#4f54b4",
+                        "secondary-container": "#d0e1fb",
+                        "on-surface-variant": "#464652",
+                        "on-background": "#1b1b21",
+                        "on-primary-fixed-variant": "#373a9b",
+                        "surface": "#fcf8ff",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "on-error-container": "#93000a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "stack-lg": "24px",
+                        "margin-page": "32px",
+                        "sidebar-width": "280px",
+                        "gutter": "24px",
+                        "stack-sm": "8px",
+                        "sidebar-collapsed": "64px",
+                        "stack-md": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "mono-label": ["\"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace\""],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "mono-label": ["13px", { "lineHeight": "18px", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .workspace-card:hover {
+            box-shadow: 0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        .glass-overlay {
+            backdrop-filter: blur(8px);
+            background: rgba(252, 248, 255, 0.7);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md overflow-x-hidden">
+<!-- TopNavBar (Suppressed active navigation, focusing on task) -->
+<nav class="bg-surface border-b border-outline-variant flex justify-between items-center w-full px-margin-page h-16 fixed top-0 z-50">
+<div class="flex items-center gap-4">
+<span class="text-headline-sm font-headline-sm font-bold text-primary">Master Gateway</span>
+</div>
+<div class="flex items-center gap-stack-md">
+<button class="flex items-center gap-2 text-on-surface-variant hover:bg-surface-container-highest transition-colors duration-200 px-3 py-1 rounded">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-label-md text-label-md">Ayuda</span>
+</button>
+<div class="h-6 w-px bg-outline-variant"></div>
+<button class="text-primary font-bold hover:underline transition-colors duration-200">Logout</button>
+</div>
+</nav>
+<main class="flex-grow pt-24 pb-12 px-margin-page flex flex-col items-center justify-center">
+<!-- Abstract Animated Background Layer (Behind Content) -->
+<div class="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+
+</div>
+<!-- Header Section -->
+<header class="text-center max-w-2xl mb-stack-lg">
+<h1 class="font-headline-lg text-headline-lg text-primary mb-2">Seleccione su Espacio de Trabajo</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Para continuar, elija el rol con el que desea operar en esta sesión.</p>
+</header>
+<!-- Bento Grid Workspace Selection -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter max-w-6xl w-full">
+<!-- Architect Workspace Card -->
+<div class="workspace-card bg-surface-container-lowest border border-outline-variant p-6 flex flex-col gap-4 group transition-all duration-300 relative overflow-hidden">
+<div class="absolute top-4 right-4">
+<span class="bg-tertiary-fixed text-on-tertiary-fixed-variant text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full">Activo</span>
+</div>
+<div class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary mb-2 transition-transform duration-300 group-hover:scale-110">
+<span class="material-symbols-outlined text-3xl" data-icon="account_tree">account_tree</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-1">Arquitecto de Sistemas</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+                        Acceso total a la infraestructura de microservicios, diseño de esquemas y orquestación de contenedores.
+                    </p>
+</div>
+<div class="mt-auto pt-4 flex flex-col gap-3">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm" data-icon="lock_open">lock_open</span>
+<span class="text-[11px] font-medium">Nivel de Acceso: 5 (Global)</span>
+</div>
+<button class="w-full py-3 bg-primary text-on-primary font-bold transition-all duration-200 hover:bg-primary-container active:scale-95 flex items-center justify-center gap-2" onclick="selectRole('Arquitecto')">
+<span>Seleccionar</span>
+<span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Network Operator Card -->
+<div class="workspace-card bg-surface-container-lowest border border-outline-variant p-6 flex flex-col gap-4 group transition-all duration-300 relative overflow-hidden">
+<div class="absolute top-4 right-4">
+<span class="bg-secondary-container text-on-secondary-container text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full">Standard</span>
+</div>
+<div class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary mb-2 transition-transform duration-300 group-hover:scale-110">
+<span class="material-symbols-outlined text-3xl" data-icon="settings_input_component">settings_input_component</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-1">Operador de Red</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+                        Monitoreo de tráfico en tiempo real, gestión de firewalls y optimización de latencia entre nodos.
+                    </p>
+</div>
+<div class="mt-auto pt-4 flex flex-col gap-3">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm" data-icon="lock_open">lock_open</span>
+<span class="text-[11px] font-medium">Nivel de Acceso: 3 (Operativo)</span>
+</div>
+<button class="w-full py-3 bg-primary text-on-primary font-bold transition-all duration-200 hover:bg-primary-container active:scale-95 flex items-center justify-center gap-2" onclick="selectRole('Operador')">
+<span>Seleccionar</span>
+<span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Security Auditor Card -->
+<div class="workspace-card bg-surface-container-lowest border border-outline-variant p-6 flex flex-col gap-4 group transition-all duration-300 relative overflow-hidden">
+<div class="absolute top-4 right-4">
+<span class="bg-error-container text-on-error-container text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full">Restringido</span>
+</div>
+<div class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary mb-2 transition-transform duration-300 group-hover:scale-110">
+<span class="material-symbols-outlined text-3xl" data-icon="security">security</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-1">Auditor de Seguridad</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+                        Revisión de logs, análisis forense de vulnerabilidades y cumplimiento normativo (Zero-Trust).
+                    </p>
+</div>
+<div class="mt-auto pt-4 flex flex-col gap-3">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm" data-icon="lock">lock</span>
+<span class="text-[11px] font-medium">Nivel de Acceso: 4 (Solo Lectura)</span>
+</div>
+<button class="w-full py-3 bg-primary text-on-primary font-bold transition-all duration-200 hover:bg-primary-container active:scale-95 flex items-center justify-center gap-2" onclick="selectRole('Auditor')">
+<span>Seleccionar</span>
+<span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<!-- System Message / Zero Trust Banner -->
+<div class="mt-stack-lg max-w-6xl w-full flex flex-col md:flex-row gap-6 items-stretch">
+<div class="flex-1 bg-surface-container-low border border-outline-variant p-6 flex items-start gap-4">
+<span class="material-symbols-outlined text-primary" data-icon="gpp_maybe">gpp_maybe</span>
+<div>
+<h4 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-1">Aviso de Seguridad</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Su sesión está siendo monitoreada bajo protocolos de cifrado de extremo a extremo. El cambio de rol requiere una nueva validación biométrica en el siguiente paso.</p>
+</div>
+</div>
+<div class="w-full md:w-1/3 relative h-32 md:h-auto overflow-hidden border border-outline-variant">
+<div class="w-full h-full bg-cover bg-center transition-transform duration-700 hover:scale-105" data-alt="An abstract, high-tech digital visualization of a secure data server farm with glowing indigo and teal lines representing connectivity pathways. The style is modern, corporate, and clean with a focus on deep primary colors and subtle glassmorphism effects. The mood is professional, safe, and technologically superior, matching a zero-trust enterprise environment." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCi8yizpoWEY0Pwv8Ks0tGGyGGhD_pmvnVhpwq-fV4Gna3Mn0e6zWtSfCvxIrpKGm8Icae2p-A5kuJ9JqqNOfnGpkc_pmhtfejJ5mdy6Y8C7SJYS9LAs8vlL9hdtlV5mfSra2uh36sEko3BnIHhrdC7-vFaA1BauKurSeDaEY5YuattYxHYmblTwabjYspnV1kBDwcA_EifpRw970IRLu62Th_H9LNlx0LF6izUKjNED4T1fvFAHKI17x3zUEGO_vVld-frZDFOuFAF')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-primary/60 to-transparent flex items-end p-4">
+<span class="text-white font-label-md text-[10px] tracking-widest uppercase">Datacenter Status: Optimal</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Selection Loading Overlay (Initially Hidden) -->
+<div class="fixed inset-0 z-[100] flex items-center justify-center glass-overlay opacity-0 pointer-events-none transition-opacity duration-300" id="loading-overlay">
+<div class="text-center flex flex-col items-center gap-4">
+<div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+<p class="font-headline-sm text-primary" id="loading-text">Autenticando Espacio...</p>
+</div>
+</div>
+<script>
+        function selectRole(role) {
+            const overlay = document.getElementById('loading-overlay');
+            const text = document.getElementById('loading-text');
+            
+            overlay.classList.remove('opacity-0', 'pointer-events-none');
+            text.innerText = `Accediendo como ${role}...`;
+            
+            // Artificial delay to simulate heavy enterprise handshake
+            setTimeout(() => {
+                window.location.href = "#dashboard"; // Logic: Redirect to chosen role dashboard
+                overlay.classList.add('opacity-0', 'pointer-events-none');
+            }, 1800);
+        }
+
+        // Lightweight atmospheric effect for background circles
+        document.addEventListener('mousemove', (e) => {
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            // No direct manipulation of webgl tag, but could trigger internal events if needed
+        });
+    </script>
+</body></html>

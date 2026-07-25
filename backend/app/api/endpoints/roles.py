@@ -5,6 +5,7 @@ Incluye: CRUD de roles + asignación de usuarios, módulos y menús a roles.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_
 from typing import List
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, CurrentUser
@@ -13,6 +14,12 @@ from app.services.role_service import RoleService
 from app.services.user_service import UserService
 from app.services.module_service import ModuleService
 from app.services.menu_service import MenuService
+from app.models.user_role import UserRole
+from app.models.role_module import RoleModule
+from app.models.role_menu import RoleMenu
+from app.models.user import User
+from app.models.module import Module
+from app.models.menu import Menu
 
 router = APIRouter()
 
@@ -39,6 +46,50 @@ async def get_role(
     if not role:
         raise HTTPException(status_code=404, detail="Rol no encontrado")
     return role
+
+
+@router.get("/{role_id}/permissions", summary="Obtener usuarios, módulos y menús asignados a un rol")
+async def get_role_permissions(
+    role_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retorna los IDs y nombres de usuarios, módulos y menús asignados actualmente al rol.
+    Usado por el panel de administración de permisos del rol.
+    """
+    role = await RoleService.get_by_id(db, role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Rol no encontrado")
+
+    # Usuarios asignados (activos)
+    stmt_users = (
+        select(User)
+        .join(UserRole, and_(UserRole.user_id == User.id, UserRole.role_id == role_id, UserRole.estado == "ACTIVO"))
+        .where(User.estado == "ACTIVO")
+    )
+    users_result = await db.execute(stmt_users)
+    users = [{"id": u.id, "nombre": u.nombre, "email": u.email} for u in users_result.scalars().all()]
+
+    # Módulos asignados
+    stmt_modules = (
+        select(Module)
+        .join(RoleModule, and_(RoleModule.module_id == Module.id, RoleModule.role_id == role_id))
+        .where(Module.estado == "ACTIVO")
+    )
+    modules_result = await db.execute(stmt_modules)
+    modules = [{"id": m.id, "nombre": m.nombre, "descripcion": m.descripcion} for m in modules_result.scalars().all()]
+
+    # Menús asignados
+    stmt_menus = (
+        select(Menu)
+        .join(RoleMenu, and_(RoleMenu.menu_id == Menu.id, RoleMenu.role_id == role_id))
+        .where(Menu.estado == "ACTIVO")
+    )
+    menus_result = await db.execute(stmt_menus)
+    menus = [{"id": m.id, "texto": m.texto} for m in menus_result.scalars().all()]
+
+    return {"users": users, "modules": modules, "menus": menus}
 
 
 @router.post("/", response_model=RoleResponse, status_code=status.HTTP_201_CREATED, summary="Crear un rol")

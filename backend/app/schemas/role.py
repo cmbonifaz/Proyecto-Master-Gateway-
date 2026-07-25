@@ -10,7 +10,7 @@ from datetime import datetime
 
 
 class RoleBase(BaseModel):
-    nombre: str = Field(..., max_length=100, pattern=r"^[A-Z_]+$")
+    nombre: str = Field(..., max_length=100, pattern=r"^[A-Z0-9_]+$")
     descripcion: Optional[str] = Field(None, max_length=500)
 
     @field_validator("nombre")
@@ -33,7 +33,7 @@ class RoleCreate(RoleBase):
 
 
 class RoleUpdate(BaseModel):
-    nombre: Optional[str] = Field(None, max_length=100, pattern=r"^[A-Z_]+$")
+    nombre: Optional[str] = Field(None, max_length=100, pattern=r"^[A-Z0-9_]+$")
     descripcion: Optional[str] = Field(None, max_length=500)
 
     @field_validator("nombre")

@@ -15,6 +15,7 @@ class MenuBase(BaseModel):
     icono: Optional[str] = Field(None, max_length=100, description="Clase de ícono CSS")
     orden: Optional[str] = Field(None, max_length=10, description="Orden numérico o string (ej. '001')")
     parent_id: Optional[str] = Field(None, description="UUID del menú padre, si aplica")
+    modulo_id: Optional[str] = Field(None, description="UUID del módulo al que pertenece el menú")
 
     @field_validator("texto", "url", "icono", "orden")
     @classmethod
@@ -34,6 +35,7 @@ class MenuUpdate(BaseModel):
     icono: Optional[str] = Field(None, max_length=100)
     orden: Optional[str] = Field(None, max_length=10)
     parent_id: Optional[str] = Field(None)
+    modulo_id: Optional[str] = Field(None)
 
     @field_validator("texto", "url", "icono", "orden")
     @classmethod
@@ -63,6 +65,7 @@ class MenuNode(BaseModel):
     icono: Optional[str] = None
     orden: Optional[str] = None
     parent_id: Optional[str] = None
+    modulo_id: Optional[str] = None
     children: List["MenuNode"] = []
 
     class Config:

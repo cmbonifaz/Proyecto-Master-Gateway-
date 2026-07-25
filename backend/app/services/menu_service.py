@@ -32,6 +32,7 @@ class MenuService:
             icono=obj_in.icono,
             orden=obj_in.orden,
             parent_id=obj_in.parent_id,
+            modulo_id=obj_in.modulo_id,
             creado_por=creator_id,
             actualizado_por=creator_id
         )
@@ -55,6 +56,9 @@ class MenuService:
             if obj_in.parent_id == db_obj.id:
                 raise ValueError("Un menú no puede ser su propio padre.")
             db_obj.parent_id = obj_in.parent_id
+            
+        if obj_in.modulo_id is not None:
+            db_obj.modulo_id = obj_in.modulo_id
             
         db_obj.actualizado_por = updater_id
         db.add(db_obj)
@@ -87,6 +91,7 @@ class MenuService:
                 Menu.icono,
                 Menu.orden,
                 Menu.parent_id,
+                Menu.modulo_id,
                 Menu.estado
             )
             .join(RoleMenu, Menu.id == RoleMenu.menu_id)
@@ -104,6 +109,7 @@ class MenuService:
                 menu_alias.icono,
                 menu_alias.orden,
                 menu_alias.parent_id,
+                menu_alias.modulo_id,
                 menu_alias.estado
             )
             .join(anchor, anchor.c.parent_id == menu_alias.id)
@@ -120,7 +126,8 @@ class MenuService:
             cte_union.c.url,
             cte_union.c.icono,
             cte_union.c.orden,
-            cte_union.c.parent_id
+            cte_union.c.parent_id,
+            cte_union.c.modulo_id
         ).distinct()
 
         result = await db.execute(stmt)
@@ -136,6 +143,7 @@ class MenuService:
                 "icono": row.icono,
                 "orden": row.orden,
                 "parent_id": row.parent_id,
+                "modulo_id": row.modulo_id,
                 "children": []
             }
 
