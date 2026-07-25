@@ -117,12 +117,10 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          $body = @{
-            chat_id = $env:TELEGRAM_CHAT_ID
-            text    = "⏳ [JOB 2/4] INICIO: Análisis SAST con SonarQube para el PR #$env:PR_NUMBER."
-          }
+          $json = "{`"chat_id`":`"$env:TELEGRAM_CHAT_ID`",`"text`":`"[JOB 2/4] INICIO: Analisis SAST con SonarQube para el PR #$env:PR_NUMBER.`"}"
+          $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
           Invoke-WebRequest -Uri "https://api.telegram.org/bot$env:TELEGRAM_TOKEN/sendMessage" `
-            -Method POST -Body $body -UseBasicParsing | Out-Null
+            -Method POST -Body $bytes -ContentType "application/json; charset=utf-8" -UseBasicParsing | Out-Null
 
       - name: Ejecutar SonarQube Scanner
         uses: sonarsource/sonarqube-scan-action@master
@@ -194,12 +192,10 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          $body = @{
-            chat_id = $env:TELEGRAM_CHAT_ID
-            text    = "✅ [JOB 2/4] SONARQUBE PASS: Quality Gate superado en el PR #$env:PR_NUMBER. Sin deuda técnica crítica. Iniciando pruebas funcionales..."
-          }
+          $json = "{`"chat_id`":`"$env:TELEGRAM_CHAT_ID`",`"text`":`"[JOB 2/4] SONARQUBE PASS: Quality Gate superado en el PR #$env:PR_NUMBER. Sin deuda tecnica critica. Iniciando pruebas funcionales...`"}"
+          $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
           Invoke-WebRequest -Uri "https://api.telegram.org/bot$env:TELEGRAM_TOKEN/sendMessage" `
-            -Method POST -Body $body -UseBasicParsing | Out-Null
+            -Method POST -Body $bytes -ContentType "application/json; charset=utf-8" -UseBasicParsing | Out-Null
 
       # ── MANEJO DE FALLO: Quality Gate no pasó ──
       - name: Notificar SonarQube FAIL a Telegram
@@ -210,12 +206,10 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          $body = @{
-            chat_id = $env:TELEGRAM_CHAT_ID
-            text    = "❌ [JOB 2/4] SONARQUBE FAIL: El Quality Gate NO fue superado en el PR #$env:PR_NUMBER. Revisar el dashboard de SonarQube."
-          }
+          $json = "{`"chat_id`":`"$env:TELEGRAM_CHAT_ID`",`"text`":`"[JOB 2/4] SONARQUBE FAIL: El Quality Gate NO fue superado en el PR #$env:PR_NUMBER. Revisar el dashboard de SonarQube.`"}"
+          $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
           Invoke-WebRequest -Uri "https://api.telegram.org/bot$env:TELEGRAM_TOKEN/sendMessage" `
-            -Method POST -Body $body -UseBasicParsing | Out-Null
+            -Method POST -Body $bytes -ContentType "application/json; charset=utf-8" -UseBasicParsing | Out-Null
 
   # ==============================================================================
   # JOB 3: MERGE AUTOMÁTICO Y PRUEBAS FUNCIONALES
