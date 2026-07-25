@@ -750,41 +750,6 @@ _Por favor, revisa las líneas indicadas y corrige el código antes de reabrir e
         with open(report_file, "w", encoding="utf-8") as f:
             f.write(report_content)
 
-        # ── GENERAR RESUMEN TELEGRAM ──────────────────────────────────────────
-        actor = os.environ.get("GITHUB_ACTOR", "Desconocido")
-        pr_num = os.environ.get("PR_NUMBER", "N/A")
-        head_ref = os.environ.get("GITHUB_HEAD_REF", "dev")
-        base_ref = os.environ.get("GITHUB_BASE_REF", "test")
-        sha = os.environ.get("GITHUB_SHA", "N/A")[:7]
-
-        summary_msg = f"""🛡️ RESUMEN DE ANÁLISIS: Gatekeeper ML
-Informe generado por Random Forest + AST (CVEFixes)
-
-━━━━━━━━━━━━━━━━━━━━
-📌 Resumen del evento
-Autor: {actor}
-PR: #{pr_num} ({head_ref} -> {base_ref})
-Commit: {sha}
-Resultado: 🔴 RECHAZADO (VULNERABLE)
-
-━━━━━━━━━━━━━━━━━━━━
-📁 Archivos analizados ({len(modified_files)})
-- {archivos_afectados}
-
-━━━━━━━━━━━━━━━━━━━━
-📊 Métricas ML & AST
-- Probabilidad ML Vulnerabilidad: {vuln_prob:.2f}%
-- Funciones Peligrosas AST: {ast_features_dict['dangerous_func_count']}
-- Concatenación de Strings: {'Sí' if ast_features_dict['has_string_concat'] == 1 else 'No'}
-- Secretos Hardcodeados: {'Sí' if ast_features_dict['has_hardcoded_secret'] == 1 else 'No'}
-
-━━━━━━━━━━━━━━━━━━━━
-🛑 Vulnerabilidades Detectadas:
-{anomalies_text}
-"""
-        with open("telegram_resumen.txt", "w", encoding="utf-8") as f:
-            f.write(summary_msg)
-
         telegram_msg = (
             f"🚨 ALERTA CRÍTICA: Código Vulnerable Detectado 🚨\n\n"
             f"El análisis de seguridad bloqueó el PR.\n"
@@ -803,37 +768,6 @@ Resultado: 🔴 RECHAZADO (VULNERABLE)
 
     else:
         # ES SEGURO
-        actor = os.environ.get("GITHUB_ACTOR", "Desconocido")
-        pr_num = os.environ.get("PR_NUMBER", "N/A")
-        head_ref = os.environ.get("GITHUB_HEAD_REF", "dev")
-        base_ref = os.environ.get("GITHUB_BASE_REF", "test")
-        sha = os.environ.get("GITHUB_SHA", "N/A")[:7]
-        archivos_afectados = ", ".join(modified_files) if modified_files else "Sin cambios detectados"
-
-        summary_msg = f"""🛡️ RESUMEN DE ANÁLISIS: Gatekeeper ML
-Informe generado por Random Forest + AST (CVEFixes)
-
-━━━━━━━━━━━━━━━━━━━━
-📌 Resumen del evento
-Autor: {actor}
-PR: #{pr_num} ({head_ref} -> {base_ref})
-Commit: {sha}
-Resultado: 🟢 APROBADO (SEGURO)
-
-━━━━━━━━━━━━━━━━━━━━
-📁 Archivos analizados ({len(modified_files)})
-- {archivos_afectados}
-
-━━━━━━━━━━━━━━━━━━━━
-📊 Métricas ML & AST
-- Probabilidad ML Vulnerabilidad: {vuln_prob:.2f}%
-- Funciones Peligrosas AST: {ast_features_dict['dangerous_func_count']}
-- Concatenación de Strings: {'Sí' if ast_features_dict['has_string_concat'] == 1 else 'No'}
-- Secretos Hardcodeados: {'Sí' if ast_features_dict['has_hardcoded_secret'] == 1 else 'No'}
-"""
-        with open("telegram_resumen.txt", "w", encoding="utf-8") as f:
-            f.write(summary_msg)
-
         report_content = (
             f"✅ REVISIÓN DE SEGURIDAD APROBADA: El código es estadísticamente seguro.\n"
             f"Probabilidad ML de vulnerabilidad: {vuln_prob:.2f}%"
