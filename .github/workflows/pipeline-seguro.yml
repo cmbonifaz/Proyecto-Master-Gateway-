@@ -20,7 +20,7 @@ jobs:
   # Corre en los servidores de GitHub — no necesita acceso a red local
   # ==============================================================================
   gatekeeper-security-check:
-    name: "Análisis de Seguridad ML (Gatekeeper)"
+    name: "🤖 Análisis de Seguridad ML (Gatekeeper)"
     runs-on: ubuntu-latest
     env:
       # Token necesario para autenticar la CLI de GitHub
@@ -111,7 +111,7 @@ jobs:
   # ya que el runner es Windows y el 'curl' nativo de Linux no está disponible.
   # ==============================================================================
   sonarqube-analysis:
-    name: "Análisis SAST SonarQube Community"
+    name: "🔍 Análisis SAST SonarQube Community"
     needs: gatekeeper-security-check
     runs-on: self-hosted
 
@@ -318,7 +318,7 @@ Commit: https://github.com/$env:GITHUB_REPOSITORY/commit/$env:GITHUB_SHA
   # Corre después del Gatekeeper ML Y del SonarQube (ambos deben pasar)
   # ==============================================================================
   auto-merge-and-test:
-    name: "Merge a Test y Pytest"
+    name: "🧪 Merge a Test y Pytest"
     needs: [gatekeeper-security-check, sonarqube-analysis]
     runs-on: ubuntu-latest
     env:
@@ -430,7 +430,7 @@ Commit: https://github.com/$env:GITHUB_REPOSITORY/commit/$env:GITHUB_SHA
   # No hay despliegue a Render — el merge a main es el paso final.
   # ==============================================================================
   promote-to-main:
-    name: "Promoción a Main"
+    name: "🚀 Promoción a Main"
     needs: auto-merge-and-test
     runs-on: ubuntu-latest
     env:
