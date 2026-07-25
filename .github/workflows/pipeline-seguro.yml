@@ -178,7 +178,7 @@ jobs:
           Write-Host "Quality Gate: $qgStatus"
 
           if ($qgStatus -ne "OK") {
-            Write-Error "❌ Quality Gate FALLIDO: $qgStatus. Revisar $serverUrl/dashboard?id=Master-Gateway"
+            Write-Error "FALLO: Quality Gate no superado ($qgStatus). Revisar $serverUrl/dashboard?id=Master-Gateway"
             exit 1
           }
           Write-Host "✅ Quality Gate APROBADO"
