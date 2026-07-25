@@ -6,6 +6,7 @@ on:
     branches:
       - test
     types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 # Declaración explícita de permisos necesarios para que GitHub CLI (gh) pueda operar sin usar actions de terceros
 permissions:
