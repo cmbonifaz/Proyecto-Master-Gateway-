@@ -64,16 +64,7 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python -c "
-          import os, urllib.request, urllib.parse
-          token = os.environ.get('TELEGRAM_TOKEN')
-          chat_id = os.environ.get('TELEGRAM_CHAT_ID')
-          if os.path.exists('telegram_resumen.txt'):
-              with open('telegram_resumen.txt', 'r', encoding='utf-8') as f:
-                  text = f.read()
-              data = urllib.parse.urlencode({'chat_id': chat_id, 'text': text}).encode('utf-8')
-              urllib.request.urlopen(f'https://api.telegram.org/bot{token}/sendMessage', data=data)
-          "
+          python -c "import os, urllib.request, urllib.parse; token = os.environ.get('TELEGRAM_TOKEN'); chat_id = os.environ.get('TELEGRAM_CHAT_ID'); (os.path.exists('telegram_resumen.txt') and urllib.request.urlopen(f'https://api.telegram.org/bot{token}/sendMessage', data=urllib.parse.urlencode({'chat_id': chat_id, 'text': open('telegram_resumen.txt', 'r', encoding='utf-8').read()}).encode('utf-8')))"
 
       # ── MANEJO DE FALLO (SE DETECTÓ CÓDIGO VULNERABLE) ──
       - name: Acciones correctivas ante código VULNERABLE
@@ -365,35 +356,47 @@ Commit: https://github.com/$env:GITHUB_REPOSITORY/commit/$env:GITHUB_SHA
       # ── NOTIFICAR RESUMEN DE PRUEBAS PYTEST ──
       - name: Notificar resumen de pruebas Pytest a Telegram
         if: always() && !cancelled()
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          REPO: ${{ github.repository }}
         run: |
-          PR_NUM="${{ github.event.pull_request.number }}"
-          HEAD_REF="${{ github.head_ref }}"
-          BASE_REF="${{ github.base_ref }}"
-          SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          ACTOR="${{ github.actor }}"
-          
-          SUMMARY="🧪 RESUMEN DE PRUEBAS FUNCIONALES (PYTEST)
-Informe de Ejecución de Pruebas Unitarias
+          python -c "
+          import os, urllib.request, urllib.parse
+          token = os.environ.get('TELEGRAM_TOKEN')
+          chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+          pr = os.environ.get('PR_NUM', '')
+          head = os.environ.get('HEAD_REF', '')
+          base = os.environ.get('BASE_REF', '')
+          sha = os.environ.get('SHA', '')[:7]
+          actor = os.environ.get('ACTOR', '')
+          repo = os.environ.get('REPO', '')
+          text = f'''🧪 RESUMEN DE PRUEBAS FUNCIONALES (PYTEST)
+  Informe de Ejecución de Pruebas Unitarias
 
-━━━━━━━━━━━━━━━━━━━━
-📌 Resumen del evento
-Autor: ${ACTOR}
-PR: #${PR_NUM} (${HEAD_REF} -> ${BASE_REF})
-Commit: ${SHA}
+  ━━━━━━━━━━━━━━━━━━━━
+  📌 Resumen del evento
+  Autor: {actor}
+  PR: #{pr} ({head} -> {base})
+  Commit: {sha}
 
-━━━━━━━━━━━━━━━━━━━━
-📊 Detalles de Ejecución
-- Entorno BD: SQLite Async (en memoria)
-- Módulos probados: Auth, Users, Roles, Menus
-- Cobertura de Código: Reporte generado (coverage.xml)
+  ━━━━━━━━━━━━━━━━━━━━
+  📊 Detalles de Ejecución
+  - Entorno BD: SQLite Async (en memoria)
+  - Módulos probados: Auth, Users, Roles, Menus
+  - Cobertura de Código: Reporte generado (coverage.xml)
 
-━━━━━━━━━━━━━━━━━━━━
-🔗 Enlaces
-- Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
-
-          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
-            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="$SUMMARY"
+  ━━━━━━━━━━━━━━━━━━━━
+  🔗 Enlaces
+  - Commit: https://github.com/{repo}/commit/{os.environ.get('SHA', '')}'''
+          data = urllib.parse.urlencode({'chat_id': chat_id, 'text': text}).encode('utf-8')
+          urllib.request.urlopen(f'https://api.telegram.org/bot{token}/sendMessage', data=data)
+          "
 
       # ── MANEJO DE FALLO EN PRUEBAS ──
       - name: Notificar fallo de pruebas a Telegram
