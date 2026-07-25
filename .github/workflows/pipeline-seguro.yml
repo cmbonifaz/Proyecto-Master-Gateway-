@@ -122,6 +122,33 @@ jobs:
           Invoke-WebRequest -Uri "https://api.telegram.org/bot$env:TELEGRAM_TOKEN/sendMessage" `
             -Method POST -Body $bytes -ContentType "application/json; charset=utf-8" -UseBasicParsing | Out-Null
 
+      # ── GENERAR COBERTURA ANTES DEL SCAN ─────────────────────────────────────
+      # El coverage.xml debe existir ANTES de que el scanner arranque,
+      # de lo contrario SonarQube reporta "No report found".
+      - name: Instalar Python y dependencias para cobertura
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Generar reporte de cobertura (pytest-cov)
+        shell: powershell
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          JWT_SECRET: "test-secret-for-ci-only"
+          JWT_ALGORITHM: "HS256"
+          TEMP_TOKEN_EXPIRE_MINUTES: "5"
+          ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+          REFRESH_TOKEN_EXPIRE_DAYS: "7"
+        run: |
+          cd backend
+          pip install -r requirements.txt --quiet
+          pytest tests/ -v --tb=short `
+            --cov=app `
+            --cov-report=xml:coverage.xml `
+            --cov-report=term-missing
+          # Mover el reporte a la raiz para que el scanner lo encuentre
+          Move-Item -Path coverage.xml -Destination ../backend/coverage.xml -Force -ErrorAction SilentlyContinue
+
       - name: Ejecutar SonarQube Scanner
         uses: sonarsource/sonarqube-scan-action@master
         env:
@@ -135,6 +162,7 @@ jobs:
             -Dsonar.sources=backend/app
             -Dsonar.tests=backend/tests
             -Dsonar.python.version=3.11
+            -Dsonar.python.coverage.reportPaths=backend/coverage.xml
             -Dsonar.exclusions=**/alembic/**,**/__pycache__/**,**/*.pyc,**/pipeline/**
 
       - name: Verificar Quality Gate de SonarQube (PowerShell)
@@ -239,7 +267,10 @@ jobs:
       - name: Ejecutar pruebas unitarias (Pytest)
         run: |
           cd backend
-          pytest tests/ -v --tb=short
+          pytest tests/ -v --tb=short \
+            --cov=app \
+            --cov-report=xml:coverage.xml \
+            --cov-report=term-missing
         env:
           # Tests usan SQLite en memoria — no necesitan la DATABASE_URL real de Supabase
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"

@@ -1,0 +1,715 @@
+﻿--- PAGINA 1 ---
+Universidad de las Fuerzas Armadas ESPE
+Departamento de Ciencias de la Computaci┬┤on
+Carrera de Ingenier┬┤─▒a en Software
+Desarrollo de Software Seguro
+Proyecto Integrador Parcial III
+Docente: Geovanny Cudco
+30 de junio de 2026
+1.
+Tema
+Sistema de Autenticaci┬┤on y Autorizaci┬┤on Centralizado (Master Gateway)
+2.
+Descripci┬┤on General:
+En la actualidad, el desarrollo de aplicaciones empresariales ha evolucionado hacia
+arquitecturas de microservicios para garantizar escalabilidad, independencia de desplie-
+gue y diversidad tecnol┬┤ogica. Sin embargo, esta descentralizaci┬┤on trae consigo un desaf┬┤─▒o
+cr┬┤─▒tico: la fragmentaci┬┤on de la identidad y el control de acceso.
+Cuando cada microservicio implementa su propio mecanismo de autenticaci┬┤on y au-
+torizaci┬┤on, se generan silos de seguridad, duplicaci┬┤on de c┬┤odigo, inconsistencias en la ges-
+ti┬┤on de roles y una experiencia de usuario fragmentada. Adem┬┤as, la integraci┬┤on de nuevos
+m┬┤odulos al ecosistema se vuelve lenta y propensa a errores de configuraci┬┤on, exponiendo
+vulnerabilidades cr┬┤─▒ticas (como Broken Access Control).
+El problema fundamental radica en la falta de un ÔÇØMicroservicio Maestro (Mas-
+ter)ÔÇØque act┬┤ue como el eje centralizador de la identidad. Se necesita un sistema que no
+solo valide ÔÇØqui┬┤en.es el usuario (Autenticaci┬┤on), sino ÔÇØqu┬┤eÔÇØpuede hacer y ÔÇØd┬┤ondeÔÇØpuede ir
+(Autorizaci┬┤on din┬┤amica), bas┬┤andose en una estructura de men┬┤us recursiva que se adapte
+intr┬┤─▒nsecamente a los m┬┤odulos asignados a sus roles.
+Para solventar esto, el proyecto exige la construcci┬┤on de un m┬┤odulo Full-Stack bajo
+los principios de Shift-Left (integraci┬┤on de seguridad desde las primeras fases de dise╦£no
+y codificaci┬┤on) y Zero Trust (ÔÇØNunca confiar, siempre verificarÔÇØ; asumiendo que la red
+interna es hostil y requiriendo validaci┬┤on continua).
+1
+
+--- PAGINA 2 ---
+3.
+Objetivo General
+Desarrollar un microservicio maestro de autenticaci┬┤on y autorizaci┬┤on Full-Stack que
+centralice la gesti┬┤on de identidades, roles y navegaci┬┤on, sirviendo como gateway de segu-
+ridad y enrutamiento para un ecosistema de microservicios.
+3.1.
+Objetivos Espec┬┤─▒ficos
+OE 1 Implementar un modelo de datos relacional que soporte relaciones Many-to-Many
+entre Usuarios y Roles.
+OE 2 Dise╦£nar una estructura de men┬┤us din┬┤amica y recursiva (almacenada en una sola
+tabla) que represente M┬┤odulos, Submen┬┤us e Items, asociada directamente a
+roles.
+OE 3 Desarrollar el flujo de inicio de sesi┬┤on donde el usuario seleccione activamente el rol
+con el que desea operar, cargando ┬┤unicamente el m┬┤odulo y men┬┤u asociados a dicha
+elecci┬┤on.
+OE 4 Configurar una arquitectura preparada para la integraci┬┤on de futuros microservi-
+cios (ej. M┬┤odulo de Ventas), donde el microservicio maestro emita y valide tokens
+(JWT/OAuth2) bajo el modelo Zero Trust.
+OE 5 Aplicar el enfoque Shift-Left mediante pruebas de seguridad unitarias, validaci┬┤on
+de entradas (sanitizaci┬┤on), protecci┬┤on contra inyecci┬┤on SQL (v┬┤─▒a ORM) y cifrado
+de contrase╦£nas.
+4.
+Arquitectura y Modelo de Datos
+4.1.
+Modelo Entidad-Relaci┬┤on
+A continuaci┬┤on se describen las principales relaciones que rigen el modelo de datos
+del microservicio maestro:
+Usuarios ÔåÉÔåÆRoles
+Relaci┬┤on M : N ÔÇö Un usuario puede tener m┬┤ultiples roles asignados y, a su vez, un
+rol puede estar asignado a m┬┤ultiples usuarios. Esta relaci┬┤on se materializa mediante una
+tabla intermedia (join table) que almacena los pares usuario id ÔÇô rol id.
+Roles ÔåÉÔåÆM┬┤odulos
+Relaci┬┤on 1 : N o M : N ÔÇö Un rol puede tener acceso a uno o varios m┬┤odulos admi-
+nistrativos. Si se requiere granularidad fina (por ejemplo, un m┬┤odulo compartido por
+varios roles con distintos permisos), se adopta el modelo M : N con tabla intermedia; de
+lo contrario, basta con una clave for┬┤anea rol id en la tabla de m┬┤odulos.
+2
+
+--- PAGINA 3 ---
+Men┬┤us (Estructura Recursiva)
+Se emplea una ┬┤unica tabla Menu definida por los siguientes campos:
+Campo
+Descripci┬┤on
+id
+Identificador ┬┤unico del registro.
+nombre
+Etiqueta visible en la interfaz (ej. Ventas, Re-
+portes).
+url
+Ruta hacia el microservicio destino. Solo se
+completa en nodos hoja (Items).
+modulo id
+Clave for┬┤anea que vincula el men┬┤u con su m┬┤odu-
+lo padre.
+parent id
+Referencia al id de otro registro de la misma
+tabla. Si es NULL, el nodo es un Men┬┤u Princi-
+pal; si tiene valor, es un Submen┬┤u o Item.
+De esta forma, ┬┤unicamente los nodos hoja (aquellos que no tienen hijos) contendr┬┤an
+el enlace (url) hacia el nuevo microservicio, mientras que los nodos intermedios act┬┤uan
+como agrupadores jer┬┤arquicos.
+4.2.
+Uso de Tecnolog┬┤─▒as
+Frameworks
+Se deber┬┤an utilizar frameworks modernos y robustos que faciliten la creaci┬┤on de
+estructuras seguras y modulares. Algunas opciones recomendadas son:
+ÔÇó NestJS ÔÇö Basado en TypeScript, con decoradores, inyecci┬┤on de dependencias y
+m┬┤odulos nativos de seguridad (guards, interceptors, pipes).
+ÔÇó Spring Boot ÔÇö Ecosistema Java maduro con Spring Security para autentica-
+ci┬┤on/autorizaci┬┤on declarativa.
+ÔÇó FastAPI ÔÇö Framework Python de alto rendimiento con validaci┬┤on autom┬┤atica
+mediante Pydantic y soporte nativo para OAuth2.
+ÔÇó Django ÔÇö Incluye un sistema de autenticaci┬┤on integrado y middleware extensible
+para l┬┤ogica de seguridad.
+ORMs
+Es obligatorio el uso de un Object-Relational Mapper (ORM) con el fin de:
+1. Abstraer la base de datos: Evitar escribir consultas SQL en bruto, logrando
+independencia del motor subyacente (PostgreSQL, MySQL, etc.).
+3
+
+--- PAGINA 4 ---
+2. Prevenir inyecci┬┤on SQL: Todas las consultas se construyen mediante par┬┤ame-
+tros vinculados internamente por el ORM, eliminando la posibilidad de inyecci┬┤on.
+3. Facilitar consultas recursivas: Permitir la ejecuci┬┤on de Common Table Expres-
+sions (CTE) generadas autom┬┤aticamente por el ORM para recorrer la estructura
+jer┬┤arquica de la tabla Menu.
+Algunas opciones recomendadas de ORMs compatibles con los frameworks menciona-
+dos:
+Ecosistema
+ORM Sugerido
+Node.js / NestJS
+Prisma, TypeORM
+Java / Spring Boot
+Hibernate, Spring Data JPA
+Python / FastAPI
+SQLAlchemy, Tortoise ORM
+Python / Django
+Django ORM (integrado)
+.NET
+Entity Framework Core
+5.
+Requisitos Funcionales Espec┬┤─▒ficos
+5.1.
+Gesti┬┤on de Identidad
+CRUD completo para Usuarios y Roles, manejando adecuadamente la tabla pivote
+intermedia que materializa la relaci┬┤on M : N entre ambas entidades. Todas las opera-
+ciones de creaci┬┤on, lectura, actualizaci┬┤on y eliminaci┬┤on deben garantizar la integridad
+referencial y la consistencia transaccional.
+5.2.
+Gesti┬┤on de M┬┤odulos y Men┬┤us
+ÔÇó Creaci┬┤on de M┬┤odulos: Registro de unidades funcionales del sistema (ej. Ventas,
+Recursos Humanos, Financiero).
+ÔÇó Asignaci┬┤on de M┬┤odulos a Roles: Vinculaci┬┤on que determina qu┬┤e roles tienen
+visibilidad sobre qu┬┤e m┬┤odulos administrativos.
+ÔÇó CRUD de Men┬┤us con patr┬┤on Adjacency List: Implementaci┬┤on del men┬┤u en
+una ┬┤unica tabla utilizando el patr┬┤on Adjacency List (lista de adyacencia), donde
+cada registro referencia a su nodo padre mediante parent id, soportando as┬┤─▒ la
+recursividad de forma eficiente sin necesidad de m┬┤ultiples tablas.
+5.3.
+Pantalla de ÔÇ£Espacio de TrabajoÔÇØ (Workspace Selector)
+Posterior al login cl┬┤asico (credenciales v┬┤alidas), el sistema debe impedir la carga
+directa del dashboard. En su lugar, se debe forzar la selecci┬┤on expl┬┤─▒cita del rol con
+el que el usuario desea operar en esa sesi┬┤on. Esta selecci┬┤on permite:
+ÔÇó Delimitar el contexto de seguridad de toda la sesi┬┤on.
+ÔÇó Implementar Tenant/Rol Isolation a nivel de sesi┬┤on, garantizando que cada instan-
+cia de trabajo est┬┤e aislada y acotada exclusivamente a los permisos del rol seleccio-
+nado.
+4
+
+--- PAGINA 5 ---
+5.4.
+Enrutamiento Basado en Men┬┤u
+El Frontend no debe tener las rutas hardcodeadas. En su lugar, debe construirlas
+din┬┤amicamente a partir del JSON del men┬┤u devuelto por el microservicio Master tras
+la selecci┬┤on del rol. Esto implica que la estructura de navegaci┬┤on completa ÔÇöm┬┤odulos,
+submen┬┤us e itemsÔÇö es determinada en tiempo de ejecuci┬┤on por el backend, eliminando
+cualquier dependencia est┬┤atica del cliente.
+6.
+Requisitos No Funcionales y de Seguridad (Shift-
+Left & Zero Trust)
+6.1.
+Zero Trust Architecture (ZTA)
+ÔÇó Validaci┬┤on obligatoria en cada endpoint: Todos los endpoints del sistema
+deben requerir un token v┬┤alido; no existen rutas o recursos de acceso p┬┤ublico una
+vez autenticado el flujo.
+ÔÇó Delegaci┬┤on de confianza al Master: Los microservicios hijos (futuros, ej. M┬┤odulo
+de Ventas) no deben tener su propia base de datos de usuarios. Deben
+cumplir una de las siguientes estrategias:
+a. Validaci┬┤on directa: Llamar al microservicio Master para validar el token
+en cada petici┬┤on.
+b. Validaci┬┤on asim┬┤etrica (opcional): Compartir una clave criptogr┬┤afica asim┬┤etri-
+ca (par p┬┤ublica/privada) que permita al microservicio hijo validar la firma
+del JWT sin necesidad de comunicaci┬┤on directa con el Master, re-
+duciendo latencia y acoplamiento.
+6.2.
+Principio de Menor Privilegio (Least Privilege)
+El token generado al seleccionar el rol solo debe contener los permisos estricta-
+mente necesarios para ese rol. No se incluyen permisos globales del usuario, ni de otros
+roles que pudiera tener asignados. Esto minimiza el impacto en caso de compromiso del
+token.
+6.3.
+Shift-Left Security
+ÔÇó An┬┤alisis est┬┤atico de c┬┤odigo (SAST): Integrado en el pipeline de CI/CD desde
+el primer d┬┤─▒a de desarrollo, detectando vulnerabilidades antes de que el c┬┤odigo
+llegue a producci┬┤on.
+ÔÇó Consultas parametrizadas exclusivas: Todo acceso a datos debe realizarse ex-
+clusivamente a trav┬┤es del ORM con consultas parametrizadas. Queda prohibida
+la concatenaci┬┤on de cadenas (string interpolation) para construir consultas SQL.
+ÔÇó Hash de contrase╦£nas robusto: Almacenamiento de contrase╦£nas utilizando algo-
+ritmos de hash lentos y adaptativos, tales como Argon2 o Bcrypt con un alto
+factor de costo (cost factor), resistente a ataques de fuerza bruta.
+5
+
+--- PAGINA 6 ---
+ÔÇó Gesti┬┤on segura de Secrets: Todas las credenciales, claves y tokens deben al-
+macenarse mediante variables de entorno o gestores de secrets (ej. Vault, AWS
+Secrets Manager). Queda totalmente prohibido el hardcodeo de secrets en el
+c┬┤odigo fuente.
+6.4.
+Performance
+Las consultas recursivas del men┬┤u deben estar optimizadas para evitar el problema
+cl┬┤asico de consultas N+1. Se deber┬┤an preferir t┬┤ecnicas de carga en ┬┤arbol proporcionadas
+por el ORM o el uso de Common Table Expressions (CTE) nativas de la base de datos,
+garantizando tiempos de respuesta predecibles independientemente de la profundidad del
+men┬┤u.
+7.
+Consideraciones para el Desarrollo
+7.1.
+Base de Datos
+Se sugiere emplear PostgreSQL o MySQL, dado que ambos motores ofrecen so-
+porte nativo y eficiente para consultas jer┬┤arquicas recursivas (CTE con la cl┬┤ausula
+WITH RECURSIVE en PostgreSQL; CTE recursivas disponibles desde MySQL 8.0), lo cual
+es fundamental para la tabla de men┬┤us con patr┬┤on Adjacency List.
+7.2.
+Estado de la Sesi┬┤on
+Se optar┬┤a por una arquitectura Stateless en el servidor mediante el uso de tokens
+JWT (JSON Web Tokens). Esta decisi┬┤on garantiza que el microservicio Master no co-
+lapse bajo carga a medida que se a╦£nadan m┬┤as microservicios al ecosistema, ya que no es
+necesario mantener estado de sesi┬┤on en memoria ni en base de datos del lado del servidor.
+7.3.
+Frontend
+El cliente debe ser una SPA (Single Page Application) capaz de:
+ÔÇó Interceptar las respuestas de la API del men┬┤u provenientes del Master tras la
+selecci┬┤on del rol.
+ÔÇó Inyectar rutas din┬┤amicamente al enrutador del framework utilizado (ej. Vue
+Router para Vue.js, React Router para React, Angular Router para Angular), de
+modo que la navegaci┬┤on se construya en tiempo de ejecuci┬┤on sin dependencias est┬┤ati-
+cas en el c┬┤odigo fuente del cliente.
+6
+
+--- PAGINA 7 ---
+8.
+Diagramas de Secuencia
+8.1.
+Flujo de Autenticaci┬┤on y Selecci┬┤on de Rol
+Figura 1: Diagrama de secuencia
+7
+
+--- PAGINA 8 ---
+8.2.
+Flujo de Carga Din┬┤amica del Men┬┤u Recursivo
+Figura 2: Diagrama de secuencia
+8
+
+--- PAGINA 9 ---
+8.3.
+lujo de Integraci┬┤on con Microservicio Hijo (Ej. Ventas) - Zero Trust
+Figura 3: Diagrama de secuencia
+9
+
+--- PAGINA 10 ---
+9.
+Especificaci┬┤on de Endpoints del Microservicio Maes-
+tro
+A continuaci┬┤on, se presenta la especificaci┬┤on de los endpoints m┬┤─▒nimos requeridos para
+el Microservicio Maestro.
+Previo a la tabla, es fundamental definir el Patr┬┤on de Auditor┬┤─▒a y Estado Global,
+el cual aplica de manera estricta para todas y cada una de las entidades de la base de
+datos (Usuarios, Roles, M┬┤odulos, Men┬┤us), garantizando trazabilidad y eliminaci┬┤on l┬┤ogica.
+Est┬┤andar de Campos Obligatorios por Entidad (ORM)
+Cualquier tabla creada a trav┬┤es del ORM debe heredar o incluir los siguientes campos
+por defecto:
+ÔÇó id: UUID o Auto-incremental (Seg┬┤un estrategia DB).
+ÔÇó estado: Booleano o Enum (ACTIVO, INACTIVO). Nunca se debe eliminar f┬┤─▒sica-
+mente un registro (DELETE duro), se debe hacer un Soft Delete actualizando
+este campo a INACTIVO.
+ÔÇó fecha creacion: Timestamp autom┬┤atico en el momento de la inserci┬┤on (Managed
+by ORM).
+ÔÇó fecha actualizacion: Timestamp autom┬┤atico que se actualiza en cada UPDATE
+(Managed by ORM).
+ÔÇó creado por: UUID del usuario que cre┬┤o el registro (Null si es auto-registro).
+ÔÇó actualizado por: UUID del usuario que modific┬┤o el registro por ┬┤ultima vez.
+10
+
+--- PAGINA 11 ---
+Tabla de Endpoints M┬┤─▒nimos de la Aplicaci┬┤on
+Dominio
+/
+Recurso
+M┬┤etodo
+HTTP
+Endpoint
+Descripci┬┤on
+Seguridad / Negocio
+AUTENTICACI┬┤ON
+Inicio de Se-
+si┬┤on
+POST
+/api/auth/login
+Valida credenciales, de-
+vuelve TempToken y lista
+de roles del usuario.
+Rate limiting estricto. No
+debe revelar si el usuario
+o la contrase╦£na es el in-
+correcto (mensaje gen┬┤eri-
+co).
+Selecci┬┤on
+de
+Rol
+POST
+/api/auth/select-role
+Recibe
+TempToken
+y
+roleId, devuelve JWT
+definitivo.
+El JWT emitido debe te-
+ner tiempo de expiraci┬┤on
+corto (Zero Trust).
+Renovar
+To-
+ken
+POST
+/api/auth/refresh-token
+Genera un nuevo JWT
+usando un Refresh Token
+v┬┤alido.
+Revocaci┬┤on inmediata si
+se detecta reutilizaci┬┤on
+de un Refresh Token.
+Cerrar Sesi┬┤on
+POST
+/api/auth/logout
+Invalida los tokens del
+usuario en la base de da-
+tos/Redis.
+Necesario para cortar la
+sesi┬┤on de inmediato en
+caso de compromiso.
+VALIDACI┬┤ON INTERNA
+Validar
+To-
+ken
+POST
+/api/internals/validate-token
+Endpoint privado para
+que otros microservicios
+validen el JWT.
+No expone datos sensi-
+bles, solo confirma vali-
+dez, userId y roleId.
+USUARIOS
+Contin┬┤ua en la siguiente p┬┤agina...
+11
+
+--- PAGINA 12 ---
+Continuaci┬┤on de la Tabla de Endpoints M┬┤─▒nimos
+Dominio
+/
+Recurso
+M┬┤etodo
+HTTP
+Endpoint
+Descripci┬┤on
+Seguridad / Negocio
+Listar
+Usua-
+rios
+GET
+/api/users
+Obtiene lista paginada de
+usuarios.
+Filtros obligatorios por
+estado = ACTIVO.
+Obtener
+Usuario
+GET
+/api/users/{id}
+Obtiene detalle
+de un
+usuario espec┬┤─▒fico.
+Ocultar campo de con-
+trase╦£na hasheada en la
+serializaci┬┤on (ORM).
+Crear
+Usua-
+rio
+POST
+/api/users
+Registra un nuevo usua-
+rio (Hash de contrase╦£na).
+Validaci┬┤on
+fuerte
+de
+contrase╦£na
+(Shift-
+Left). El ORM asigna
+fecha creacion.
+Actualizar
+Usuario
+PUT
+/api/users/{id}
+Actualiza datos de un
+usuario.
+El
+ORM
+actuali-
+za
+autom┬┤aticamente
+fecha actualizacion y
+actualizado por.
+Eliminar
+Usuario
+DELETE
+/api/users/{id}
+Eliminaci┬┤on
+l┬┤ogica
+del
+usuario.
+NO
+borra
+el
+regis-
+tro, cambia estado a
+INACTIVO.
+ROLES
+Listar Roles
+GET
+/api/roles
+Obtiene todos los roles
+activos.
+ÔÇö
+Contin┬┤ua en la siguiente p┬┤agina...
+12
+
+--- PAGINA 13 ---
+Continuaci┬┤on de la Tabla de Endpoints M┬┤─▒nimos
+Dominio
+/
+Recurso
+M┬┤etodo
+HTTP
+Endpoint
+Descripci┬┤on
+Seguridad / Negocio
+Crear Rol
+POST
+/api/roles
+Crea un nuevo rol en el
+sistema.
+ÔÇö
+Actualizar
+Rol
+PUT
+/api/roles/{id}
+Modifica
+nombre/des-
+cripci┬┤on del rol.
+ÔÇö
+Eliminar Rol
+DELETE
+/api/roles/{id}
+Eliminaci┬┤on
+l┬┤ogica
+del
+rol.
+Prevenir eliminaci┬┤on si
+est┬┤a asignado a usuarios
+activos.
+Asignar Rol a
+Usuario
+POST
+/api/roles/{id}/users
+Asocia un usuario exis-
+tente a este rol (M:N).
+Registra en la tabla pivo-
+te con sus propios cam-
+pos de auditor┬┤─▒a.
+Desasignar
+Rol
+DELETE
+/api/roles/{id}/users/{userId}
+Rompe la relaci┬┤on M:N
+(Eliminaci┬┤on f┬┤─▒sica en la
+tabla pivote).
+ÔÇö
+M┬┤ODULOS
+Gestionar
+M┬┤odulos
+GET
+POST
+PUT
+DELETE
+/api/modules
+/api/modules/{id}
+CRUD est┬┤andar para los
+m┬┤odulos administrativos
+(Ej: ÔÇ£VentasÔÇØ).
+Al inactivar un m┬┤odulo,
+sus men┬┤us asociados no
+deben renderizarse.
+Contin┬┤ua en la siguiente p┬┤agina...
+13
+
+--- PAGINA 14 ---
+Continuaci┬┤on de la Tabla de Endpoints M┬┤─▒nimos
+Dominio
+/
+Recurso
+M┬┤etodo
+HTTP
+Endpoint
+Descripci┬┤on
+Seguridad / Negocio
+Asignar
+M┬┤odulo
+a
+Rol
+POST
+/api/roles/{id}/modules
+Vincula un m┬┤odulo com-
+pleto a un rol.
+ÔÇö
+MEN ┬┤US (Recursivos)
+Obtener
+┬┤Arbol
+de
+Men┬┤u
+GET
+/api/menus/tree
+Devuelve
+la
+estructura
+jer┬┤arquica completa ba-
+sada en el rol del JWT.
+Cr┬┤─▒tico: El ORM de-
+be usar CTE (Common
+Table Expressions) para
+resolver la recursividad
+(parent id).
+Crear
+┬┤Item
+de Men┬┤u
+POST
+/api/menus
+Crea Men┬┤u, Submen┬┤u o
+Item.
+Requiere
+recibir
+parent id
+(null
+si
+es
+ra┬┤─▒z) y url (null si no es
+hoja/item final).
+Actualizar
+┬┤Item
+de
+Men┬┤u
+PUT
+/api/menus/{id}
+Modifica texto, url o pa-
+dre del men┬┤u.
+Validar
+que
+el
+nuevo
+parent id no genere un
+bucle infinito (referencia
+c┬┤─▒clica).
+Eliminar
+┬┤Item
+de
+Men┬┤u
+DELETE
+/api/menus/{id}
+Eliminaci┬┤on
+l┬┤ogica
+del
+men┬┤u.
+Si se elimina un padre, la
+l┬┤ogica de frontend/bac-
+kend debe ignorar los hi-
+jos.
+Contin┬┤ua en la siguiente p┬┤agina...
+14
+
+--- PAGINA 15 ---
+Continuaci┬┤on de la Tabla de Endpoints M┬┤─▒nimos
+Dominio
+/
+Recurso
+M┬┤etodo
+HTTP
+Endpoint
+Descripci┬┤on
+Seguridad / Negocio
+Asignar
+Men┬┤u a Rol
+POST
+/api/roles/{id}/menus
+Asigna
+un
+Item/Sub-
+men┬┤u
+espec┬┤─▒fico
+a
+un
+rol.
+ÔÇö
+15
+
+--- PAGINA 16 ---
+Notas de Implementaci┬┤on para el Desarrollador
+1. Gesti┬┤on de Auditor┬┤─▒a en el ORM: En frameworks como NestJS (con Ty-
+peORM/Prisma) o Python (con SQLAlchemy), se deben implementar Hooks del
+ciclo de vida del ORM (ej. @BeforeUpdate, @BeforeInsert) para garantizar que
+fecha actualizacion y estado no puedan ser manipulados manualmente desde
+el controlador, reforzando el enfoque Shift-Left.
+2. Soft Deletes en Consultas: Todas las entidades deben tener configurado un
+Global Scope o filtro autom┬┤atico a nivel de ORM (ej. where: { estado: ÔÇÖACTIVOÔÇÖ
+}) para que un desarrollador no deba escribirlo manualmente en cada endpoint y
+evitar filtrar datos inactivos por error.
+3. Seguridad en la Tabla Pivote (M:N): La tabla intermedia (ej. user has roles)
+no es una tabla tonta; tambi┬┤en debe heredar los campos de auditor┬┤─▒a (fecha creacion,
+estado) para saber cu┬┤ando se le otorg┬┤o o revoc┬┤o un permiso a un usuario espec┬┤─▒fi-
+co.
+16
+
+--- PAGINA 17 ---
+Anexo: Requisitos de Infraestructura, CI/CD
+y DevSecOps
+Estrategia de Ramas (Git Branching Strategy)
+El repositorio en GitHub debe regirse estrictamente por el siguiente modelo de ramas:
+ÔÇó main: Rama de producci┬┤on. El c┬┤odigo aqu┬┤─▒ debe ser inmutable excepto mediante
+Pull Requests desde test. ┬┤Unicamente los merges en esta rama disparan el
+despliegue autom┬┤atico.
+ÔÇó test: Rama de pruebas/QA. Aqu┬┤─▒ se integran las funcionalidades para ser validadas
+por el equipo de calidad o el cliente. Los Pull Requests hacia main nacen de aqu┬┤─▒.
+ÔÇó dev: Rama de desarrollo. Los desarrolladores crean ramas feature (ej. feature/auth-login)
+a partir de dev y hacen Pull Requests de vuelta a dev para integraci┬┤on continua.
+Pipeline CI/CD con GitHub Actions
+Se debe configurar un archivo de flujo de trabajo (.github/workflows/ci-cd.yml)
+que ejecute los siguientes pasos de forma secuencial al realizar un push o merge en la
+rama main:
+1. Build y Pruebas Unitarias: Compilaci┬┤on del proyecto y ejecuci┬┤on de pruebas.
+2. An┬┤alisis Est┬┤atico Tradicional (SonarCloud): Integraci┬┤on con SonarCloud para
+evaluar la calidad del c┬┤odigo (Code Smells, Bugs, Vulnerabilidades conocidas y
+Cobertura de Pruebas). Se debe exigir que el Quality Gate pase para continuar.
+3. An┬┤alisis SAST Avanzado (Modelo de Miner┬┤─▒a de Datos/ML): Ejecuci┬┤on
+de un contenedor Docker o script de Python que aloje un modelo de Machine
+Learning pre-entrenado. Este modelo analizar┬┤a los cambios en el c┬┤odigo buscando
+patrones an┬┤omalos o vulnerabilidades l┬┤ogicas complejas que las reglas est┬┤aticas de
+SonarCloud no detectan.
+4. Despliegue Autom┬┤atico: Si los pasos 2 y 3 son exitosos, el pipeline ejecutar┬┤a los
+comandos de la CLI del proveedor cloud para desplegar la nueva versi┬┤on.
+Infraestructura Cloud (Despliegue Autom┬┤atico)
+El microservicio maestro debe desplegarse en un servicio de plataforma como servicio
+(PaaS) gratuito orientado a desarrolladores, como Railway o Render.
+ÔÇó Requisito: El despliegue debe ser triggered por la CLI en el pipeline de GitHub
+Actions (no solo por webhook autom┬┤atico del repositorio), para asegurar que el
+c┬┤odigo desplegado haya pasado los an┬┤alisis de seguridad previamente.
+ÔÇó Gesti┬┤on de Variables de Entorno: Las credenciales de base de datos y claves
+criptogr┬┤aficas (JWT Secret) deben inyectarse desde los Secrets de GitHub Actions
+al entorno del PaaS, nunca almacenarse en el c┬┤odigo.
+17
+
+--- PAGINA 18 ---
+Sistema de Notificaciones (Telegram Bot)
+Se debe crear un Bot de Telegram (v┬┤─▒a BotFather) e integrar su token en los secretos
+del repositorio. El pipeline debe utilizar la API de Telegram para enviar mensajes a un
+grupo espec┬┤─▒fico (donde est┬┤en todos los integrantes del equipo).
+Eventos a notificar:
+ÔÇó Inicio del Pipeline en main.
+ÔÇó ┬┤Exito o fracaso del Quality Gate de SonarCloud.
+ÔÇó Alertas cr┬┤─▒ticas si el Modelo de Miner┬┤─▒a de Datos detecta patrones sospechosos de
+vulnerabilidades.
+ÔÇó Estado del despliegue en Railway/Render (┬┤Exito o Fallo).
+ÔÇó Merges exitosos hacia las ramas dev y test.
+Diagrama de Secuencia: Pipeline CI/CD y Despliegue
+El siguiente diagrama ilustra el comportamiento automatizado cuando un desarrolla-
+dor mergea c┬┤odigo a la rama main:
+18
+
+--- PAGINA 19 ---
+Figura 4: Diagrama de secuencia
+19
+
+--- PAGINA 20 ---
+Consideraciones t┬┤ecnicas para la implementaci┬┤on del
+Pipeline
+ÔÇó Sobre el Modelo de Miner┬┤─▒a de Datos: Dado que entrenar un modelo desde
+cero est┬┤a fuera del alcance ┬┤agil del desarrollo de la app, se debe utilizar un enfoque
+pragm┬┤atico: integrar una herramienta open-source basada en Machine Learning o
+un script custom que consuma una API de un modelo tipo CodeBERT fine-tuneado
+con datasets de CWEs (Common Weakness Enumerations). El script debe leer los
+archivos .ts o .py modificados en el commit y retornar un c┬┤odigo de salida 0
+(seguro) o 1 (vulnerable).
+ÔÇó Limitaciones del PaaS Gratuito: Es importante documentar en el repositorio
+que servicios gratuitos como Render ÔÇØduermenÔÇØ(sleep) tras 15 minutos de inactivi-
+dad. La primera petici┬┤on al microservicio maestro tras el reposo puede tardar Ôê╝30
+segundos. Esto es aceptable para la fase de desarrollo del proyecto, pero el dise╦£no
+de los microservicios hijos debe contemplar mecanismos de Retry (reintentos) en
+sus llamadas al Master para no fallar si el Master est┬┤a despertando.
+ÔÇó Seguridad de Secretos: El token del Bot de Telegram, el token de SonarCloud y
+las credenciales de despliegue de Railway/Render deben estar estrictamente configu-
+rados en Settings ┬┐Secrets and variables ┬┐Actions en GitHub, aplicando el principio
+de m┬┤─▒nimo privilegio.
+20
+

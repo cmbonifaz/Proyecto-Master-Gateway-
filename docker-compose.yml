@@ -1,0 +1,73 @@
+version: "3.9"
+
+services:
+
+  # ── Base de Datos PostgreSQL ───────────────────────────────────────────────
+  master_db:
+    image: postgres:16-alpine
+    container_name: master_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: master
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - gateway_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d master"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Master API (FastAPI + SQLAlchemy async) ────────────────────────────────
+  master_api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: master_api
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
+    networks:
+      - gateway_net
+    depends_on:
+      master_db:
+        condition: service_healthy
+    # Aplica migraciones, seed y arranca el servidor
+    command: >
+      sh -c "alembic upgrade head &&
+             python seed_test_data.py &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  # ── Frontend (Next.js) ─────────────────────────────────────────────────────
+  master_frontend:
+    build:
+      context: ./frontend/webapp
+      dockerfile: Dockerfile
+    container_name: master_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - gateway_net
+    depends_on:
+      - master_api
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+
+# ── Volúmenes persistentes ──────────────────────────────────────────────────
+volumes:
+  pg_data:
+    name: master_gateway_pgdata
+
+# ── Red interna compartida por todos los servicios ─────────────────────────
+networks:
+  gateway_net:
+    name: gateway_net
+    driver: bridge
