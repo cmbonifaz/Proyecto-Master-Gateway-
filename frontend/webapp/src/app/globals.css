@@ -1,0 +1,123 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #fcf8ff;
+  --color-surface-dim: #dbd9e1;
+  --color-surface-bright: #fcf8ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f5f2fb;
+  --color-surface-container: #f0ecf5;
+  --color-surface-container-high: #eae7f0;
+  --color-surface-container-highest: #e4e1ea;
+  --color-on-surface: #1b1b21;
+  --color-on-surface-variant: #464652;
+  --color-inverse-surface: #303036;
+  --color-inverse-on-surface: #f2eff8;
+  --color-outline: #777683;
+  --color-outline-variant: #c7c5d4;
+  --color-surface-tint: #4f54b4;
+  
+  --color-primary: #15157d;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #2e3192;
+  --color-on-primary-container: #9da1ff;
+  --color-inverse-primary: #c0c1ff;
+  --color-primary-fixed: #e1e0ff;
+  --color-on-primary-fixed: #04006d;
+  
+  --color-secondary: #505f76;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #d0e1fb;
+  --color-on-secondary-container: #54647a;
+  
+  --color-tertiary: #002f1e;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #004830;
+  --color-on-tertiary-container: #22c087;
+  
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+  
+  --color-background: #f8fafc;
+  --color-on-background: #1b1b21;
+  --color-surface-variant: #e4e1ea;
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --radius-sm: 0.125rem;
+  --radius-DEFAULT: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-full: 9999px;
+  
+  --spacing-sidebar-width: 280px;
+  --spacing-sidebar-collapsed: 64px;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-on-background);
+  font-family: var(--font-sans);
+}
+
+/* Base custom classes to match the system */
+@layer utilities {
+  .text-headline-lg {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 40px;
+    letter-spacing: -0.02em;
+  }
+  .text-headline-md {
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 32px;
+    letter-spacing: -0.01em;
+  }
+  .text-headline-sm {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 28px;
+  }
+  .text-body-lg {
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 24px;
+  }
+  .text-body-md {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+  }
+  .text-body-sm {
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 16px;
+  }
+  .text-label-md {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+    letter-spacing: 0.05em;
+  }
+  .text-mono-label {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 18px;
+  }
+  
+  /* Elevaciones */
+  .shadow-elevation-1 {
+    box-shadow: none;
+    border: 1px solid #E2E8F0;
+  }
+  .shadow-elevation-2 {
+    box-shadow: 0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -2px rgba(0, 0, 0, 0.1);
+  }
+}

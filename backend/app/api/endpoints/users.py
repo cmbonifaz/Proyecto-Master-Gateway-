@@ -43,9 +43,14 @@ async def create_user(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
-    # Verificar si el email ya está en uso
-    existing = await UserService.get_by_email(db, obj_in.email)
+    # Verificar si el email ya está en uso (activo o inactivo por restricciones de BD)
+    existing = await UserService.get_any_by_email(db, obj_in.email)
     if existing:
+        if existing.estado == "INACTIVO":
+            raise HTTPException(
+                status_code=400,
+                detail="El correo electrónico ya existe en el sistema pero está INACTIVO. Contacte a soporte o use otro."
+            )
         raise HTTPException(status_code=400, detail="El correo electrónico ya está registrado")
         
     creator_id = current_user["user"].id

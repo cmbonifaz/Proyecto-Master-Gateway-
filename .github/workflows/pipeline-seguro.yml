@@ -95,6 +95,8 @@ jobs:
   # JOB 2: ANÁLISIS ESTÁTICO CON SONARQUBE COMMUNITY (Self-Hosted Runner)
   # Corre en TU MÁQUINA LOCAL donde SonarQube está en http://localhost:9000
   # No necesita exposición a internet — el runner accede directamente a localhost
+  # Las notificaciones de Telegram se envían con Invoke-WebRequest (PowerShell)
+  # ya que el runner es Windows y el 'curl' nativo de Linux no está disponible.
   # ==============================================================================
   sonarqube-analysis:
     name: "🔍 Análisis SAST SonarQube Community"
@@ -107,6 +109,18 @@ jobs:
         with:
           # Necesario para que SonarQube pueda calcular blame y blame-aware issues
           fetch-depth: 0
+
+      - name: Notificar inicio del análisis SonarQube
+        shell: powershell
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          $json = "{`"chat_id`":`"$env:TELEGRAM_CHAT_ID`",`"text`":`"[JOB 2/4] INICIO: Analisis SAST con SonarQube para el PR #$env:PR_NUMBER.`"}"
+          $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+          Invoke-WebRequest -Uri "https://api.telegram.org/bot$env:TELEGRAM_TOKEN/sendMessage" `
+            -Method POST -Body $bytes -ContentType "application/json; charset=utf-8" -UseBasicParsing | Out-Null
 
       - name: Ejecutar SonarQube Scanner
         uses: sonarsource/sonarqube-scan-action@master
@@ -164,15 +178,42 @@ jobs:
           Write-Host "Quality Gate: $qgStatus"
 
           if ($qgStatus -ne "OK") {
-            Write-Error "❌ Quality Gate FALLIDO: $qgStatus. Revisar $serverUrl/dashboard?id=Master-Gateway"
+            Write-Error "FALLO: Quality Gate no superado ($qgStatus). Revisar $serverUrl/dashboard?id=Master-Gateway"
             exit 1
           }
           Write-Host "✅ Quality Gate APROBADO"
 
+      # ── MANEJO DE ÉXITO: Quality Gate pasado ──
+      - name: Notificar SonarQube PASS a Telegram
+        if: success()
+        shell: powershell
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          $json = "{`"chat_id`":`"$env:TELEGRAM_CHAT_ID`",`"text`":`"[JOB 2/4] SONARQUBE PASS: Quality Gate superado en el PR #$env:PR_NUMBER. Sin deuda tecnica critica. Iniciando pruebas funcionales...`"}"
+          $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+          Invoke-WebRequest -Uri "https://api.telegram.org/bot$env:TELEGRAM_TOKEN/sendMessage" `
+            -Method POST -Body $bytes -ContentType "application/json; charset=utf-8" -UseBasicParsing | Out-Null
+
+      # ── MANEJO DE FALLO: Quality Gate no pasó ──
+      - name: Notificar SonarQube FAIL a Telegram
+        if: failure()
+        shell: powershell
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          $json = "{`"chat_id`":`"$env:TELEGRAM_CHAT_ID`",`"text`":`"[JOB 2/4] SONARQUBE FAIL: El Quality Gate NO fue superado en el PR #$env:PR_NUMBER. Revisar el dashboard de SonarQube.`"}"
+          $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+          Invoke-WebRequest -Uri "https://api.telegram.org/bot$env:TELEGRAM_TOKEN/sendMessage" `
+            -Method POST -Body $bytes -ContentType "application/json; charset=utf-8" -UseBasicParsing | Out-Null
+
   # ==============================================================================
   # JOB 3: MERGE AUTOMÁTICO Y PRUEBAS FUNCIONALES
   # Corre después del Gatekeeper ML Y del SonarQube (ambos deben pasar)
-  # Las notificaciones de Sonar se envían desde aquí (ubuntu-latest = curl real)
   # ==============================================================================
   auto-merge-and-test:
     name: "🧪 Merge a Test y Pytest"
@@ -184,12 +225,6 @@ jobs:
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
-
-      - name: Notificar SonarQube PASS a Telegram
-        run: |
-          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
-            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="✅ [JOB 2/4] SONARQUBE PASS: Quality Gate superado en el PR #${{ github.event.pull_request.number }}. Sin deuda técnica crítica."
 
       - name: Setup de Python 3.11 para pruebas
         uses: actions/setup-python@v5
@@ -230,20 +265,22 @@ jobs:
         run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="✅ [JOB 3/4] PYTEST PASS: Todas las pruebas pasaron para el PR #${{ github.event.pull_request.number }}. Realizando merge..."
+            -d text="✅ [JOB 3/4] PYTEST PASS: Todas las pruebas pasaron para el PR #${{ github.event.pull_request.number }}. Realizando merge en test..."
 
           # Activar auto-merge para fusionar una vez que este check finalice con éxito
           gh pr merge ${{ github.event.pull_request.number }} --auto --merge
 
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="🔄 [JOB 3/4] MERGE REALIZADO: PR #${{ github.event.pull_request.number }} fusionado en rama 'test'. Iniciando despliegue..."
+            -d text="🔄 [JOB 3/4] MERGE REALIZADO: PR #${{ github.event.pull_request.number }} fusionado en rama 'test'. Iniciando promoción a main..."
 
   # ==============================================================================
-  # JOB 4: DESPLIEGUE A PRODUCCIÓN EN RENDER
+  # JOB 4: PROMOCIÓN A MAIN
+  # Fusiona la rama 'test' en 'main' tras superar todo el pipeline.
+  # No hay despliegue a Render — el merge a main es el paso final.
   # ==============================================================================
-  deploy-production:
-    name: "🚀 Promoción a Main y Despliegue en Render"
+  promote-to-main:
+    name: "🚀 Promoción a Main"
     needs: auto-merge-and-test
     runs-on: ubuntu-latest
     env:
@@ -254,30 +291,34 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: test
+          fetch-depth: 0
 
       - name: Crear y fusionar Pull Request hacia 'main'
         run: |
-          # Intentar crear el PR; si ya existe, ignorar el error
-          gh pr create --base main --head test --title "Deploy to Production — $(date +'%Y-%m-%d %H:%M')" --body "Merge automático desde test tras pipeline CI completo (ML + SonarQube + Pytest)." || true
-          # Obtener la URL del PR activo entre test y main
-          PR_URL=$(gh pr list --state open --base main --head test --json url --jq '.[0].url')
-          # Fusionar el PR
-          gh pr merge $PR_URL --merge --admin
+          # Intentar crear el PR de test → main; si ya existe, ignorar el error
+          gh pr create \
+            --base main \
+            --head test \
+            --title "chore: Promoción a main — $(date +'%Y-%m-%d %H:%M')" \
+            --body "Merge automático desde 'test' tras superar pipeline completo (ML Gatekeeper + SonarQube + Pytest)." \
+            || true
 
-      - name: Disparar webhook de despliegue en Render
-        run: |
-          curl -s -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          # Obtener el número del PR activo entre test y main
+          PR_NUMBER=$(gh pr list --state open --base main --head test --json number --jq '.[0].number')
 
-      - name: Notificación final de Despliegue Exitoso
+          # Fusionar el PR con merge commit
+          gh pr merge $PR_NUMBER --merge --admin
+
+      - name: Notificación final de Promoción Exitosa
         if: success()
         run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="🎉 [JOB 4/4] DESPLIEGUE EXITOSO: Pipeline completo terminado. El nuevo código seguro ya está en producción → https://pipeline-seguro.onrender.com"
+            -d text="🎉 [JOB 4/4] PIPELINE COMPLETADO: PR #${{ github.event.pull_request.number }} superó todos los controles (ML + SonarQube + Pytest) y fue fusionado exitosamente en 'main'."
 
-      - name: Notificación de Despliegue Fallido
+      - name: Notificación de Promoción Fallida
         if: failure()
         run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="❌ [JOB 4/4] ERROR DE DESPLIEGUE: Falló la promoción a main o el webhook de Render. Revisar Actions."
+            -d text="❌ [JOB 4/4] ERROR EN PROMOCIÓN: Falló la fusión de 'test' hacia 'main' para el PR #${{ github.event.pull_request.number }}. Revisar Actions."

@@ -17,10 +17,10 @@ async def lifespan(app: FastAPI):
     y limpiarlos al apagar.
     """
     # Startup
-    print(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} iniciando...")
+    print(f"[*] {settings.APP_NAME} v{settings.APP_VERSION} iniciando...")
     yield
     # Shutdown
-    print("🛑 Microservicio apagado correctamente.")
+    print("[*] Microservicio apagado correctamente.")
 
 
 app = FastAPI(
@@ -35,6 +35,16 @@ app = FastAPI(
     # Deshabilitar docs en producción si DEBUG=False
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None,
+)
+from fastapi.middleware.cors import CORSMiddleware
+
+# ── Configurar CORS ────────────────────────────────────────────────────────────
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://192.168.56.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ── Routers ────────────────────────────────────────────────────────────────────

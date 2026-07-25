@@ -39,6 +39,7 @@ def _build_sync_url(url: str) -> str:
     # Reemplazar driver async por sync
     sync_url = sync_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
     sync_url = sync_url.replace("postgres+asyncpg://", "postgresql+psycopg2://")
+    sync_url = sync_url.replace("sqlite+aiosqlite://", "sqlite://")
     # Normalizar postgres:// a postgresql+psycopg2://
     if sync_url.startswith("postgres://"):
         sync_url = "postgresql+psycopg2://" + sync_url[len("postgres://"):]
