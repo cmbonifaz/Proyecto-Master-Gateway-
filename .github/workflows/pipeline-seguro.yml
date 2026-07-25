@@ -239,7 +239,10 @@ jobs:
       - name: Ejecutar pruebas unitarias (Pytest)
         run: |
           cd backend
-          pytest tests/ -v --tb=short
+          pytest tests/ -v --tb=short \
+            --cov=app \
+            --cov-report=xml:coverage.xml \
+            --cov-report=term-missing
         env:
           # Tests usan SQLite en memoria — no necesitan la DATABASE_URL real de Supabase
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
