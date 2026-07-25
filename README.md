@@ -7,12 +7,11 @@
 ![Python](https://img.shields.io/badge/Python-3.11-yellow?style=for-the-badge&logo=python)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Backend-teal?style=for-the-badge&logo=fastapi)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-336791?style=for-the-badge&logo=postgresql)
-![SonarQube](https://img.shields.io/badge/SonarQube-Community-4E9BCD?style=for-the-badge&logo=sonarqube)
-![Docker](https://img.shields.io/badge/Docker-Seguro-2496ED?style=for-the-badge&logo=docker)
-![Render](https://img.shields.io/badge/Render-Producción-46E3B7?style=for-the-badge&logo=render)
+![SonarQube](https://img.shields.io/badge/SonarQube-v26.6-4E9BCD?style=for-the-badge&logo=sonarqube)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker)
 
-**🌐 API en Producción:** [https://pipeline-seguro.onrender.com](https://pipeline-seguro.onrender.com)  
-**📖 Documentación Swagger:** [https://pipeline-seguro.onrender.com/docs](https://pipeline-seguro.onrender.com/docs)
+**📖 Documentación Swagger (local):** [http://localhost:8000/docs](http://localhost:8000/docs)  
+**🔍 SonarQube (local):** [http://localhost:9000/dashboard?id=Master-Gateway](http://localhost:9000/dashboard?id=Master-Gateway)
 
 </div>
 
@@ -27,7 +26,8 @@
 - [Job 1 — Gatekeeper ML](#job-1--gatekeeper-de-seguridad-ml)
 - [Job 2 — SonarQube Community](#job-2--análisis-sast-sonarqube-community)
 - [Job 3 — Pytest](#job-3--merge-automático-y-pytest)
-- [Job 4 — Deploy Render](#job-4--despliegue-a-producción)
+- [Job 4 — Promoción a Main](#job-4--promoción-a-main)
+- [Quality Gate SonarQube](#-quality-gate-sonarqube-v266)
 - [El Modelo de Machine Learning](#-el-modelo-de-machine-learning)
 - [API — Endpoints Disponibles](#-api--endpoints-disponibles)
 - [Seguridad Implementada](#-seguridad-implementada)
@@ -62,7 +62,8 @@ Código en PR → ML Gatekeeper → SonarQube Quality Gate → Pytest → Deploy
 | **ORM** | SQLAlchemy async + Alembic + PostgreSQL (Supabase) |
 | **Auditoría** | Soft Delete global + campos `estado`, `fecha_creacion`, `creado_por` en todos los modelos |
 | **Notificaciones** | Bot de Telegram en tiempo real (cada etapa del pipeline) |
-| **Despliegue** | Docker en Render, merge automático `test → main` |
+| **Despliegue** | Merge automático `test → main` tras superar el pipeline completo |
+| **Docker** | Stack completo con `docker-compose.yml` (API + Frontend + PostgreSQL) |
 
 ---
 
@@ -98,15 +99,15 @@ Código en PR → ML Gatekeeper → SonarQube Quality Gate → Pytest → Deploy
 │                                   ▼                                        │
 │  ┌──────────────────┐                                                       │
 │  │  JOB 4           │  runs-on: ubuntu-latest                              │
-│  │  Deploy Render   │──── PR test→main (auto) + Webhook Render            │
+│  │  Promoción Main  │──── Crea PR test→main + merge automático             │
 │  │  (rama main)     │──── Notificación final a Telegram 🎉                │
 │  └──────────────────┘                                                       │
 └─────────────────────────────────────────────────────────────────────────────┘
                                    │
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│           RENDER — pipeline-seguro.onrender.com                             │
-│           FastAPI + PostgreSQL (Supabase) en Docker (usuario no-root)       │
+│           rama main — código 100% verificado (ML + Sonar + Pytest)          │
+│           Listo para despliegue manual o integración con cualquier PaaS     │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -219,20 +220,39 @@ auto-merge-and-test:
 
 ---
 
-### JOB 4 — Despliegue a Producción
+### JOB 4 — Promoción a Main
 
 **Entorno:** `runs-on: ubuntu-latest`
 
 ```yaml
-deploy-production:
+promote-to-main:
   needs: auto-merge-and-test
   steps:
-    - Checkout rama 'test'
-    - Crear PR automático test → main
-    - gh pr merge --admin (merge automático)
-    - curl webhook Render (trigger redeploy Docker)
-    - Notificación final a Telegram 🎉
+    - Checkout rama 'test' (fetch-depth: 0)
+    - Crear PR automático test → main (si no existe)
+    - gh pr merge --admin (merge commit)
+    - Notificación final a Telegram 🎉 o ❌
 ```
+
+> El Job 4 **no dispara ningún webhook externo**. El merge a `main` es el paso final del pipeline. El código en `main` queda listo para ser desplegado manualmente en cualquier PaaS (Render, Railway, etc.) cuando el equipo lo decida.
+
+---
+
+## 📊 Quality Gate SonarQube v26.6
+
+Configurado en `http://localhost:9000` → **Quality Gates** → `Master-Gateway-QG`.
+
+El proyecto usa **MQR Mode** (Multi-Quality Rule, activo por defecto en v26.6):
+
+| Métrica | Clave interna | Condición | Umbral |
+|---|---|:---:|:---:|
+| **Security Issues** | `software_quality_security_issues` | `>` | `0` |
+| **Reliability Issues** | `software_quality_reliability_issues` | `>` | `5` |
+| **Maintainability Issues** | `software_quality_maintainability_issues` | `>` | `15` |
+| **Coverage** | `coverage` | `<` | `60%` |
+| **Duplicated Lines (%)** | `duplicated_lines_density` | `>` | `10%` |
+
+> **¿Por qué MQR Mode?** SonarQube v26.6 reemplaza las métricas clásicas (`bugs`, `vulnerabilities`, `code_smells`) por el modelo de **Software Qualities** (Security, Reliability, Maintainability). El Quality Gate debe fallar — bloqueando el pipeline — si alguna condición no se cumple.
 
 ---
 
@@ -318,10 +338,18 @@ deploy-production:
 | Validación input | Pydantic: regex, tipos, longitudes máx, `EmailStr`, `bleach` |
 | Auditoría ORM | `BaseAudit`: `estado`, `fecha_creacion`, `fecha_actualizacion`, `creado_por`, `actualizado_por` |
 
-### Variables de Entorno (Render)
+### Variables de Entorno
 
 ```env
-DATABASE_URL=postgresql+asyncpg://user:pass@host/db   # Supabase
+# Desarrollo local (SQLite — sin necesidad de Supabase)
+DATABASE_URL=sqlite+aiosqlite:///./master_auth.db
+
+# Producción con Supabase (cuando Supabase está activo)
+DATABASE_URL=postgresql+asyncpg://postgres:<PASSWORD>@db.<REF>.supabase.co:5432/postgres
+
+# Docker Compose (usa el contenedor master_db como host)
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@master_db:5432/master
+
 JWT_SECRET=<secreto_fuerte_min_32_chars>
 JWT_ALGORITHM=HS256
 TEMP_TOKEN_EXPIRE_MINUTES=5
@@ -337,10 +365,11 @@ REFRESH_TOKEN_EXPIRE_DAYS=7
 |---|---|---|
 | `TELEGRAM_TOKEN` | Token del bot de Telegram | [@BotFather](https://t.me/BotFather) → `/newbot` |
 | `TELEGRAM_CHAT_ID` | ID del grupo/chat | [@userinfobot](https://t.me/userinfobot) |
-| `RENDER_DEPLOY_HOOK_URL` | Webhook de redeploy | Render Dashboard → Settings → Deploy Hook |
 | `SONAR_TOKEN` | Token de usuario SonarQube | SonarQube → My Account → Security → Tokens |
 | `SONAR_HOST_URL` | URL del servidor SonarQube | `http://localhost:9000` (accedido por runner local) |
 | `GITHUB_TOKEN` | Gestión de PRs e Issues | Automático en GitHub Actions |
+
+> ⚠️ `RENDER_DEPLOY_HOOK_URL` fue eliminado. El Job 4 ya no dispara despliegues en Render.
 
 > **Configuración adicional en GitHub:**  
 > Settings → Actions → General → Workflow permissions:  
@@ -548,15 +577,15 @@ git push origin dev
 | Quality Gate fail | `❌ [JOB 2/4] SONARQUBE FAIL: Quality Gate no superado` |
 | Pytest exitoso | `✅ [JOB 3/4] PYTEST PASS: Todas las pruebas pasaron` |
 | Pytest fallido | `❌ [JOB 3/4] ERROR PYTEST: Pruebas funcionales fallaron` |
-| Merge realizado | `🔄 [JOB 3/4] MERGE REALIZADO: PR fusionado en test` |
-| Despliegue exitoso | `🎉 [JOB 4/4] DESPLIEGUE EXITOSO: Código en producción` |
-| Despliegue fallido | `❌ [JOB 4/4] ERROR DE DESPLIEGUE: Falló el webhook` |
+| Merge a test realizado | `🔄 [JOB 3/4] MERGE REALIZADO: PR fusionado en rama 'test'` |
+| Promoción a main OK | `🎉 [JOB 4/4] PIPELINE COMPLETADO: fusionado exitosamente en 'main'` |
+| Promoción a main FAIL | `❌ [JOB 4/4] ERROR EN PROMOCIÓN: Falló la fusión hacia 'main'` |
 
 ---
 
 <div align="center">
 
-[🌐 Ver API en Producción](https://pipeline-seguro.onrender.com/docs) · [📊 Ver Pipeline en GitHub Actions](../../actions) · [🔍 Ver SonarQube](http://localhost:9000)
+[📖 Swagger UI local](http://localhost:8000/docs) · [📊 Pipeline en GitHub Actions](../../actions) · [🔍 SonarQube local](http://localhost:9000) · [🐳 Guía Docker](./DOCKER.md)
 
 **Proyecto Parcial III — Desarrollo Seguro 2026-50**
 
