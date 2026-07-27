@@ -55,6 +55,19 @@ jobs:
         run: |
           python scripts/analizador_ci.py cambios.diff
 
+      # ── ENVIAR RESUMEN DEL ANÁLISIS ML A TELEGRAM ──
+      - name: Enviar resumen del análisis ML a Telegram
+        if: always()
+        run: |
+          if [ -f telegram_summary.txt ]; then
+            SUMMARY=$(cat telegram_summary.txt)
+          else
+            SUMMARY="[JOB 1/4] RESUMEN ML GATEKEEPER\n---\nNo se pudo generar el resumen del analisis."
+          fi
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            --data-urlencode text="$SUMMARY"
+
       # ── MANEJO DE FALLO (SE DETECTÓ CÓDIGO VULNERABLE) ──
       - name: Acciones correctivas ante código VULNERABLE
         if: failure()
@@ -75,13 +88,13 @@ jobs:
           gh issue create --title "Vulnerabilidad detectada en PR #${{ github.event.pull_request.number }}" --body-file reporte_seguridad.txt
 
           # 5. Enviar notificación urgente a Telegram
-          MSG="🚨 [JOB 1/4] ALERTA CRÍTICA: PR #${{ github.event.pull_request.number }} BLOQUEADO por código vulnerable. Revisar Issue creado en el repositorio."
+          MSG="[JOB 1/4] ALERTA CRITICA: PR #${{ github.event.pull_request.number }} BLOQUEADO por codigo vulnerable. Revisar Issue creado en el repositorio."
           if [ -f telegram_msg.txt ]; then
             MSG=$(cat telegram_msg.txt)
           fi
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="$MSG"
+            --data-urlencode text="$MSG"
 
       # ── MANEJO DE ÉXITO (EL CÓDIGO ES SEGURO) ──
       - name: Notificar éxito de seguridad ML
@@ -89,7 +102,7 @@ jobs:
         run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="✅ [JOB 1/4] GATEKEEPER PASS: El código del PR #${{ github.event.pull_request.number }} es seguro. Iniciando análisis SonarQube..."
+            -d text="[JOB 1/4] GATEKEEPER PASS: El codigo del PR #${{ github.event.pull_request.number }} es seguro. Iniciando analisis SonarQube..."
 
   # ==============================================================================
   # JOB 2: ANÁLISIS ESTÁTICO CON SONARQUBE COMMUNITY (Self-Hosted Runner)
