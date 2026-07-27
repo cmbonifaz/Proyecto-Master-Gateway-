@@ -178,7 +178,7 @@ jobs:
             -Dsonar.python.coverage.reportPaths=backend/coverage.xml
             -Dsonar.exclusions=**/alembic/**,**/__pycache__/**,**/*.pyc,**/pipeline/**
 
-      - name: Verificar Quality Gate de SonarQube (PowerShell)
+      - name: Verificar Quality Gate y recopilar metricas SonarQube (PowerShell)
         shell: powershell
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -193,22 +193,22 @@ jobs:
           $ceTaskId = ($content | Where-Object { $_ -match "^ceTaskId=" }) -replace "^ceTaskId=", ""
           Write-Host "Task ID: $ceTaskId"
 
-          # Esperar hasta que el análisis termine (máx 5 minutos)
+          # Esperar hasta que el analisis termine (max 5 minutos)
           $timeout = 300
           $start = Get-Date
           do {
             Start-Sleep -Seconds 5
             $task = Invoke-RestMethod -Uri "$serverUrl/api/ce/task?id=$ceTaskId" -Headers $headers
             $taskStatus = $task.task.status
-            Write-Host "Análisis en progreso... Estado: $taskStatus"
+            Write-Host "Analisis en progreso... Estado: $taskStatus"
             if (((Get-Date) - $start).TotalSeconds -gt $timeout) {
-              Write-Error "Timeout: el análisis de SonarQube tardó más de 5 minutos."
+              Write-Error "Timeout: el analisis de SonarQube tardo mas de 5 minutos."
               exit 1
             }
           } while ($taskStatus -eq "PENDING" -or $taskStatus -eq "IN_PROGRESS")
 
           if ($taskStatus -ne "SUCCESS") {
-            Write-Error "El análisis de SonarQube falló con estado: $taskStatus"
+            Write-Error "El analisis de SonarQube fallo con estado: $taskStatus"
             exit 1
           }
 
@@ -218,13 +218,91 @@ jobs:
           $qgStatus = $qg.projectStatus.status
           Write-Host "Quality Gate: $qgStatus"
 
+          # Consultar metricas del proyecto via API de SonarQube
+          $metricsToFetch = "bugs,vulnerabilities,code_smells,coverage,duplicated_lines_density,ncloc,security_rating,reliability_rating,sqale_rating"
+          $metricsUrl = "$serverUrl/api/measures/component?component=Master-Gateway&metricKeys=$metricsToFetch"
+          $metricsResp = Invoke-RestMethod -Uri $metricsUrl -Headers $headers
+          $measures = $metricsResp.component.measures
+
+          # Funcion para extraer valor de una metrica
+          function Get-Measure($name) {
+            $m = $measures | Where-Object { $_.metric -eq $name }
+            if ($m -and $m.value) { return $m.value } else { return "N/D" }
+          }
+
+          # Funcion para convertir rating numerico a letra (1=A ... 5=E)
+          function Rating-Letter($val) {
+            switch ($val) {
+              "1" { return "A" }; "2" { return "B" }; "3" { return "C" }
+              "4" { return "D" }; "5" { return "E" }; default { return "N/D" }
+            }
+          }
+
+          $bugs        = Get-Measure "bugs"
+          $vulns       = Get-Measure "vulnerabilities"
+          $smells      = Get-Measure "code_smells"
+          $coverage    = Get-Measure "coverage"
+          $duplication = Get-Measure "duplicated_lines_density"
+          $ncloc       = Get-Measure "ncloc"
+          $secRating   = Rating-Letter (Get-Measure "security_rating")
+          $relRating   = Rating-Letter (Get-Measure "reliability_rating")
+          $manRating   = Rating-Letter (Get-Measure "sqale_rating")
+
+          $qgLabel  = if ($qgStatus -eq "OK") { "APROBADO" } else { "RECHAZADO ($qgStatus)" }
+          $decision = if ($qgStatus -eq "OK") { "APROBADO - Quality Gate superado" } else { "RECHAZADO - Quality Gate no superado" }
+          $coverageDisplay    = if ($coverage -ne "N/D") { "$coverage%" } else { "N/D" }
+          $duplicationDisplay = if ($duplication -ne "N/D") { "$duplication%" } else { "N/D" }
+
+          $summaryLines = @(
+            "[JOB 2/4] RESUMEN SONARQUBE",
+            "---",
+            "Proyecto: Master-Gateway",
+            "Quality Gate: $qgLabel",
+            "---",
+            "Metricas de codigo:",
+            "Bugs: $bugs",
+            "Vulnerabilidades: $vulns",
+            "Code Smells: $smells",
+            "Lineas de codigo: $ncloc",
+            "Cobertura de pruebas: $coverageDisplay",
+            "Duplicacion: $duplicationDisplay",
+            "---",
+            "Ratings de calidad:",
+            "Seguridad: $secRating",
+            "Fiabilidad: $relRating",
+            "Mantenibilidad: $manRating",
+            "---",
+            "Decision: $decision"
+          )
+          $summaryText = $summaryLines -join "`n"
+          [System.IO.File]::WriteAllText("sonar_summary.txt", $summaryText, [System.Text.Encoding]::UTF8)
+          Write-Host "Resumen SonarQube guardado en sonar_summary.txt"
+
           if ($qgStatus -ne "OK") {
             Write-Error "FALLO: Quality Gate no superado ($qgStatus). Revisar $serverUrl/dashboard?id=Master-Gateway"
             exit 1
           }
-          Write-Host "✅ Quality Gate APROBADO"
+          Write-Host "Quality Gate APROBADO"
 
-      # ── MANEJO DE ÉXITO: Quality Gate pasado ──
+      # ── ENVIAR RESUMEN SONARQUBE A TELEGRAM (siempre, antes del PASS/FAIL) ──
+      - name: Enviar resumen SonarQube a Telegram
+        if: always()
+        shell: powershell
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if (Test-Path "sonar_summary.txt") {
+            $summaryText = [System.IO.File]::ReadAllText("sonar_summary.txt", [System.Text.Encoding]::UTF8)
+          } else {
+            $summaryText = "[JOB 2/4] RESUMEN SONARQUBE`n---`nNo se pudo generar el resumen del analisis."
+          }
+          $body = @{ chat_id = $env:TELEGRAM_CHAT_ID; text = $summaryText } | ConvertTo-Json -Compress
+          $bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
+          Invoke-WebRequest -Uri "https://api.telegram.org/bot$env:TELEGRAM_TOKEN/sendMessage" `
+            -Method POST -Body $bytes -ContentType "application/json; charset=utf-8" -UseBasicParsing | Out-Null
+
+      # ── MANEJO DE EXITO: Quality Gate pasado ──
       - name: Notificar SonarQube PASS a Telegram
         if: success()
         shell: powershell
@@ -238,7 +316,7 @@ jobs:
           Invoke-WebRequest -Uri "https://api.telegram.org/bot$env:TELEGRAM_TOKEN/sendMessage" `
             -Method POST -Body $bytes -ContentType "application/json; charset=utf-8" -UseBasicParsing | Out-Null
 
-      # ── MANEJO DE FALLO: Quality Gate no pasó ──
+      # ── MANEJO DE FALLO: Quality Gate no paso ──
       - name: Notificar SonarQube FAIL a Telegram
         if: failure()
         shell: powershell
