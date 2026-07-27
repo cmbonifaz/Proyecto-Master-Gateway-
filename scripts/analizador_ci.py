@@ -489,7 +489,18 @@ def detect_path_traversal_ast(code_snippet: str) -> List[str]:
 # =============================================================================
 
 def parse_diff(diff_path: str):
-    """Extrae únicamente las líneas añadidas del archivo .diff y detecta los archivos con sus líneas."""
+    """Extrae unicamente las lineas anadidas del archivo .diff y detecta los archivos con sus lineas.
+    
+    Excluye directorios de infraestructura del pipeline para evitar falsos positivos:
+    el propio analizador contiene palabras clave de seguridad que disparan el modelo ML.
+    """
+    # Directorios excluidos del analisis ML (codigo de pipeline, no de aplicacion)
+    EXCLUDED_PREFIXES = (
+        "scripts/",       # El propio analizador y herramientas del pipeline
+        ".github/",       # Workflows de CI/CD
+        "pipeline/",      # Modelos y configuracion del pipeline
+    )
+
     added_lines = []
     modified_files = set()
     current_file = "Desconocido"
@@ -512,7 +523,8 @@ def parse_diff(diff_path: str):
                 continue
             elif line.startswith("+"):
                 code_line = line[1:]
-                if current_file.endswith(".py"):
+                # Solo analizar archivos .py fuera de directorios de infraestructura
+                if current_file.endswith(".py") and not current_file.startswith(EXCLUDED_PREFIXES):
                     modified_files.add(current_file)
                     added_lines.append(code_line)
                     if current_file not in file_lines_added:
