@@ -555,7 +555,22 @@ def main():
     # 1. Parsear diff
     code_snippet, modified_files, file_lines_added = parse_diff(diff_path)
     if not code_snippet.strip():
-        print("No se encontraron adiciones de código en el PR. Omitiendo análisis.")
+        print("No se encontraron adiciones de codigo Python en el PR. Omitiendo analisis ML.")
+        # Generar resumen para Telegram indicando que no habia codigo Python
+        summary_lines = [
+            "[JOB 1/4] RESUMEN ML GATEKEEPER",
+            "---",
+            "Archivos Python analizados: 0",
+            "  - Sin archivos .py modificados en este PR",
+            "---",
+            "No se encontro codigo Python para analizar.",
+            "El analisis ML fue omitido automaticamente.",
+            "---",
+            "Decision: OMITIDO - Sin codigo Python en el PR",
+        ]
+        summary_text = "\n".join(summary_lines)
+        with open("telegram_summary.txt", "w", encoding="utf-8") as f:
+            f.write(summary_text)
         sys.exit(0)
 
     # 2. Cargar Modelos
