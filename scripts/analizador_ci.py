@@ -489,7 +489,18 @@ def detect_path_traversal_ast(code_snippet: str) -> List[str]:
 # =============================================================================
 
 def parse_diff(diff_path: str):
-    """Extrae únicamente las líneas añadidas del archivo .diff y detecta los archivos con sus líneas."""
+    """Extrae unicamente las lineas anadidas del archivo .diff y detecta los archivos con sus lineas.
+    
+    Excluye directorios de infraestructura del pipeline para evitar falsos positivos:
+    el propio analizador contiene palabras clave de seguridad que disparan el modelo ML.
+    """
+    # Directorios excluidos del analisis ML (codigo de pipeline, no de aplicacion)
+    EXCLUDED_PREFIXES = (
+        "scripts/",       # El propio analizador y herramientas del pipeline
+        ".github/",       # Workflows de CI/CD
+        "pipeline/",      # Modelos y configuracion del pipeline
+    )
+
     added_lines = []
     modified_files = set()
     current_file = "Desconocido"
@@ -512,7 +523,8 @@ def parse_diff(diff_path: str):
                 continue
             elif line.startswith("+"):
                 code_line = line[1:]
-                if current_file.endswith(".py"):
+                # Solo analizar archivos .py fuera de directorios de infraestructura
+                if current_file.endswith(".py") and not current_file.startswith(EXCLUDED_PREFIXES):
                     modified_files.add(current_file)
                     added_lines.append(code_line)
                     if current_file not in file_lines_added:
@@ -555,7 +567,22 @@ def main():
     # 1. Parsear diff
     code_snippet, modified_files, file_lines_added = parse_diff(diff_path)
     if not code_snippet.strip():
-        print("No se encontraron adiciones de código en el PR. Omitiendo análisis.")
+        print("No se encontraron adiciones de codigo Python en el PR. Omitiendo analisis ML.")
+        # Generar resumen para Telegram indicando que no habia codigo Python
+        summary_lines = [
+            "[JOB 1/4] RESUMEN ML GATEKEEPER",
+            "---",
+            "Archivos Python analizados: 0",
+            "  - Sin archivos .py modificados en este PR",
+            "---",
+            "No se encontro codigo Python para analizar.",
+            "El analisis ML fue omitido automaticamente.",
+            "---",
+            "Decision: OMITIDO - Sin codigo Python en el PR",
+        ]
+        summary_text = "\n".join(summary_lines)
+        with open("telegram_summary.txt", "w", encoding="utf-8") as f:
+            f.write(summary_text)
         sys.exit(0)
 
     # 2. Cargar Modelos

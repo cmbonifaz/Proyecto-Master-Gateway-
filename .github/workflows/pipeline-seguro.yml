@@ -385,10 +385,12 @@ jobs:
             exit 0
           fi
 
-          # Contar tests por estado
-          PASSED=$(grep -c "^PASSED" "$OUTPUT_FILE" || true)
-          FAILED=$(grep -c "^FAILED" "$OUTPUT_FILE" || true)
-          ERROR_COUNT=$(grep -c "^ERROR " "$OUTPUT_FILE" || true)
+          # Contar tests desde la linea de resumen final de pytest
+          # Formato: "= X passed, Y failed, Z error in T.XXs ="
+          SUMMARY_LINE=$(grep -E "[0-9]+ passed|[0-9]+ failed|[0-9]+ error" "$OUTPUT_FILE" | grep -E "==" | tail -1)
+          PASSED=$(echo "$SUMMARY_LINE" | grep -oE "[0-9]+ passed" | grep -oE "[0-9]+" || echo "0")
+          FAILED=$(echo "$SUMMARY_LINE" | grep -oE "[0-9]+ failed" | grep -oE "[0-9]+" || echo "0")
+          ERROR_COUNT=$(echo "$SUMMARY_LINE" | grep -oE "[0-9]+ error" | grep -oE "[0-9]+" || echo "0")
           PASSED=${PASSED:-0}; FAILED=${FAILED:-0}; ERROR_COUNT=${ERROR_COUNT:-0}
           TOTAL=$((PASSED + FAILED + ERROR_COUNT))
 
@@ -407,8 +409,9 @@ jobs:
             QG_STATUS="APROBADO"
           fi
 
-          # Extraer nombres de tests fallidos (max 5)
-          FAILED_TESTS=$(grep "^FAILED" "$OUTPUT_FILE" | head -5 | sed 's/^FAILED /  - /' || true)
+          # Extraer nombres de tests fallidos del resumen final de pytest (max 5)
+          # En pytest verbose, el resumen tiene lineas: "FAILED tests/x.py::test_y - reason"
+          FAILED_TESTS=$(grep -E "^FAILED " "$OUTPUT_FILE" | head -5 | sed 's/^FAILED /  - /' || true)
 
           {
             echo "[JOB 3/4] RESUMEN PYTEST"
