@@ -652,32 +652,32 @@ def main():
         # Anomalías detectadas por AST (con categoría específica)
         if ast_vuln_categories:
             for cat in ast_vuln_categories:
-                anomalies.append(f"- 🔴 {cat}")
+                anomalies.append(f"- [CRITICO] {cat}")
 
         # Anomalías detectadas por heurística de texto (que no estén ya en AST)
-        existing_prefixes = {a.split("—")[0].strip("- 🔴 ") for a in anomalies}
+        existing_prefixes = {a.split("—")[0].strip("- [CRITICO] ") for a in anomalies}
         for cat in heuristic_categories:
             prefix = cat.split("—")[0].strip()
             if prefix not in existing_prefixes:
-                anomalies.append(f"- 🟠 {cat} (detectado por análisis de texto)")
+                anomalies.append(f"- [ALERTA] {cat} (detectado por analisis de texto)")
 
         # Path Traversal detectado por AST especializado
         for finding in path_traversal_findings:
-            anomalies.append(f"- 🔴 {finding}")
+            anomalies.append(f"- [CRITICO] {finding}")
 
         # Concatenación de strings (posible SQLi/XSS)
         if ast_features_dict["has_string_concat"] == 1 and not anomalies:
-            anomalies.append("- 🟡 Concatenación de strings detectada (posible riesgo de inyección).")
+            anomalies.append("- [AVISO] Concatenacion de strings detectada (posible riesgo de inyeccion).")
 
         # Si el modelo ML disparó pero las heurísticas no encontraron nada específico
         if not anomalies and has_ml_signal:
             anomalies.append(
-                "- 🟠 El modelo ML identificó patrones asociados con código inseguro "
+                f"- [ALERTA] El modelo ML identifico patrones asociados con codigo inseguro "
                 f"(probabilidad: {vuln_prob:.1f}%)."
             )
 
         anomalies_text = "\n".join(anomalies) if anomalies else (
-            "- El modelo identificó patrones comúnmente asociados con código inseguro."
+            "- El modelo identifico patrones comunmente asociados con codigo inseguro."
         )
 
         # ── BUSCAR LÍNEAS CULPABLES ───────────────────────────────────────────
@@ -697,7 +697,7 @@ def main():
                 for pattern in all_patterns:
                     if pattern.lower() in l_lower:
                         culprit_lines.append(
-                            f"  - `{f_name}` (Línea {l_num}): `{l_text.strip()[:80]}`"
+                            f"  - `{f_name}` (Linea {l_num}): `{l_text.strip()[:80]}`"
                         )
                         matched = True
                         break
@@ -709,74 +709,128 @@ def main():
                         html_words = ["<html", "<body", "<script", "<div", "innerHTML"]
                         if any(w in l_lower for w in sql_words):
                             culprit_lines.append(
-                                f"  - `{f_name}` (Línea {l_num}) [Posible SQLi]: `{l_text.strip()[:80]}`"
+                                f"  - `{f_name}` (Linea {l_num}) [Posible SQLi]: `{l_text.strip()[:80]}`"
                             )
                         elif any(w in l_lower for w in html_words):
                             culprit_lines.append(
-                                f"  - `{f_name}` (Línea {l_num}) [Posible XSS]: `{l_text.strip()[:80]}`"
+                                f"  - `{f_name}` (Linea {l_num}) [Posible XSS]: `{l_text.strip()[:80]}`"
                             )
 
         lineas_texto = ""
         if culprit_lines:
-            lineas_texto = "\n**Líneas Sospechosas Identificadas:**\n" + "\n".join(culprit_lines[:15])
+            lineas_texto = "\n**Lineas Sospechosas Identificadas:**\n" + "\n".join(culprit_lines[:15])
             if len(culprit_lines) > 15:
-                lineas_texto += f"\n  - ... (y {len(culprit_lines) - 15} líneas más)"
+                lineas_texto += f"\n  - ... (y {len(culprit_lines) - 15} lineas mas)"
 
         archivos_afectados = ", ".join(modified_files) if modified_files else "Desconocido"
 
-        report_content = f"""🚨 **RECHAZO AUTOMÁTICO - REVISIÓN DE SEGURIDAD FALLIDA** 🚨
+        report_content = f"""RECHAZO AUTOMATICO - REVISION DE SEGURIDAD FALLIDA
 
-El análisis estático de seguridad ha detectado código potencialmente **VULNERABLE** en tu Pull Request.
+El analisis estatico de seguridad ha detectado codigo potencialmente VULNERABLE en tu Pull Request.
 
-**Detalles del Análisis:**
-- **Archivos afectados:** {archivos_afectados}
-- **Probabilidad ML de vulnerabilidad:** {vuln_prob:.2f}%
-- **Funciones peligrosas detectadas (AST):** {ast_features_dict['dangerous_func_count']}
-- **Decisión:** Bloqueo Automático (Revisión requerida)
+Detalles del Analisis:
+- Archivos afectados: {archivos_afectados}
+- Probabilidad ML de vulnerabilidad: {vuln_prob:.2f}%
+- Funciones peligrosas detectadas (AST): {ast_features_dict['dangerous_func_count']}
+- Decision: Bloqueo Automatico (Revision requerida)
 
-**Tipos de Vulnerabilidad Detectadas:**
+Tipos de Vulnerabilidad Detectadas:
 {anomalies_text}
 {lineas_texto}
 
-**Guía de Corrección:**
-- Cat.2 (Comandos): Usa listas en `subprocess.run([...], shell=False)` en vez de strings
-- Cat.3 (Deserialización): Usa `yaml.safe_load()` en vez de `yaml.load()`. Evita `pickle` con datos externos
-- Cat.4 (Path Traversal): Valida y normaliza rutas con `os.path.realpath()` y lista blanca
-- Cat.5 (Secretos): Usa variables de entorno `os.environ.get('API_KEY')`. Usa `hashlib.sha256()` o `bcrypt`
-- Cat.6 (SSRF/XSS): Valida URLs contra lista blanca. Usa `html.escape()` para salida HTML
+Guia de Correccion:
+- Cat.2 (Comandos): Usa listas en subprocess.run([...], shell=False) en vez de strings
+- Cat.3 (Deserializacion): Usa yaml.safe_load() en vez de yaml.load(). Evita pickle con datos externos
+- Cat.4 (Path Traversal): Valida y normaliza rutas con os.path.realpath() y lista blanca
+- Cat.5 (Secretos): Usa variables de entorno os.environ.get('API_KEY'). Usa hashlib.sha256() o bcrypt
+- Cat.6 (SSRF/XSS): Valida URLs contra lista blanca. Usa html.escape() para salida HTML
 
-_Por favor, revisa las líneas indicadas y corrige el código antes de reabrir el PR._
+Por favor, revisa las lineas indicadas y corrige el codigo antes de reabrir el PR.
 """
         with open(report_file, "w", encoding="utf-8") as f:
             f.write(report_content)
 
+        # Resumen del analisis para Telegram (antes del mensaje de rechazo)
+        total_cats = len(ast_vuln_categories) + len(heuristic_categories) + len(path_traversal_findings)
+        archivos_list = "\n".join(f"  - {f}" for f in modified_files) if modified_files else "  - Sin archivos .py detectados"
+        summary_lines = [
+            "[JOB 1/4] RESUMEN ML GATEKEEPER",
+            "---",
+            f"Archivos Python analizados: {len(modified_files)}",
+            archivos_list,
+            "---",
+            f"Probabilidad ML de vulnerabilidad: {vuln_prob:.2f}%",
+            f"Funciones peligrosas (AST): {ast_features_dict['dangerous_func_count']}",
+            f"Llamadas totales analizadas: {ast_features_dict['total_calls']}",
+            f"Importaciones: {ast_features_dict['num_imports']}",
+            f"Concatenacion de strings: {'Si' if ast_features_dict['has_string_concat'] else 'No'}",
+            f"Secreto hardcodeado: {'Si' if ast_features_dict['has_hardcoded_secret'] else 'No'}",
+            "---",
+            f"Categorias de vulnerabilidad detectadas: {total_cats}",
+        ]
+        if anomalies:
+            summary_lines.append("Vulnerabilidades:")
+            summary_lines.extend(anomalies[:8])  # max 8 para no exceder limite Telegram
+            if len(anomalies) > 8:
+                summary_lines.append(f"  ... y {len(anomalies) - 8} mas")
+        summary_lines.append("---")
+        summary_lines.append("Decision: RECHAZADO - Codigo vulnerable detectado")
+        summary_text = "\n".join(summary_lines)
+        with open("telegram_summary.txt", "w", encoding="utf-8") as f:
+            f.write(summary_text)
+
         telegram_msg = (
-            f"🚨 ALERTA CRÍTICA: Código Vulnerable Detectado 🚨\n\n"
-            f"El análisis de seguridad bloqueó el PR.\n"
+            f"ALERTA CRITICA: Codigo Vulnerable Detectado\n\n"
+            f"El analisis de seguridad bloqueo el PR.\n"
             f"Probabilidad ML: {vuln_prob:.2f}%\n\n"
-            f"📁 Archivos: {archivos_afectados}\n\n"
-            f"🛑 Vulnerabilidades:\n{anomalies_text}"
+            f"Archivos: {archivos_afectados}\n\n"
+            f"Vulnerabilidades:\n{anomalies_text}"
         )
         with open("telegram_msg.txt", "w", encoding="utf-8") as f:
             f.write(telegram_msg)
 
-        print("🚨 CÓDIGO VULNERABLE DETECTADO. Probabilidad ML:", f"{vuln_prob:.2f}%")
+        print("CODIGO VULNERABLE DETECTADO. Probabilidad ML:", f"{vuln_prob:.2f}%")
         print(f"   Funciones peligrosas (AST): {ast_features_dict['dangerous_func_count']}")
-        print(f"   Categorías detectadas: {len(ast_vuln_categories + heuristic_categories + path_traversal_findings)}")
-        print("Reporte generado. Finalizando con código de error (Exit 1).")
+        print(f"   Categorias detectadas: {len(ast_vuln_categories + heuristic_categories + path_traversal_findings)}")
+        print("Reporte generado. Finalizando con codigo de error (Exit 1).")
         sys.exit(1)
 
     else:
         # ES SEGURO
+        archivos_afectados = ", ".join(modified_files) if modified_files else "Desconocido"
         report_content = (
-            f"✅ REVISIÓN DE SEGURIDAD APROBADA: El código es estadísticamente seguro.\n"
+            f"REVISION DE SEGURIDAD APROBADA: El codigo es estadisticamente seguro.\n"
             f"Probabilidad ML de vulnerabilidad: {vuln_prob:.2f}%"
         )
         with open(report_file, "w", encoding="utf-8") as f:
             f.write(report_content)
 
-        print("✅ REVISIÓN DE SEGURIDAD APROBADA: Código seguro detectado. Probabilidad de riesgo:", f"{vuln_prob:.2f}%")
-        print("Reporte generado. Finalizando con éxito (Exit 0).")
+        # Resumen del analisis para Telegram (antes del mensaje de aprobacion)
+        archivos_list = "\n".join(f"  - {f}" for f in modified_files) if modified_files else "  - Sin archivos .py detectados"
+        summary_lines = [
+            "[JOB 1/4] RESUMEN ML GATEKEEPER",
+            "---",
+            f"Archivos Python analizados: {len(modified_files)}",
+            archivos_list,
+            "---",
+            f"Probabilidad ML de vulnerabilidad: {vuln_prob:.2f}%",
+            f"Funciones peligrosas (AST): {ast_features_dict['dangerous_func_count']}",
+            f"Llamadas totales analizadas: {ast_features_dict['total_calls']}",
+            f"Importaciones: {ast_features_dict['num_imports']}",
+            f"Concatenacion de strings: {'Si' if ast_features_dict['has_string_concat'] else 'No'}",
+            f"Secreto hardcodeado: {'Si' if ast_features_dict['has_hardcoded_secret'] else 'No'}",
+            "---",
+            "Categorias de vulnerabilidad detectadas: 0",
+            "Sin anomalias criticas encontradas.",
+            "---",
+            "Decision: APROBADO - Codigo seguro",
+        ]
+        summary_text = "\n".join(summary_lines)
+        with open("telegram_summary.txt", "w", encoding="utf-8") as f:
+            f.write(summary_text)
+
+        print("REVISION DE SEGURIDAD APROBADA: Codigo seguro detectado. Probabilidad de riesgo:", f"{vuln_prob:.2f}%")
+        print("Reporte generado. Finalizando con exito (Exit 0).")
         sys.exit(0)
 
 
