@@ -357,11 +357,13 @@ jobs:
 
       - name: Ejecutar pruebas unitarias (Pytest)
         run: |
+          set -o pipefail
           cd backend
+          # Ejecutar pytest y capturar salida completa; pipefail asegura que el exit code de pytest se propague
           pytest tests/ -v --tb=short \
             --cov=app \
             --cov-report=xml:coverage.xml \
-            --cov-report=term-missing
+            --cov-report=term-missing 2>&1 | tee ../pytest_output.txt
         env:
           # Tests usan SQLite en memoria — no necesitan la DATABASE_URL real de Supabase
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
@@ -371,30 +373,113 @@ jobs:
           ACCESS_TOKEN_EXPIRE_MINUTES: "30"
           REFRESH_TOKEN_EXPIRE_DAYS: "7"
 
+      # ── GENERAR RESUMEN DE PYTEST PARA TELEGRAM ──
+      - name: Generar resumen de Pytest para Telegram
+        if: always()
+        run: |
+          OUTPUT_FILE="pytest_output.txt"
+          SUMMARY_FILE="pytest_summary.txt"
+
+          if [ ! -f "$OUTPUT_FILE" ]; then
+            echo "[JOB 3/4] RESUMEN PYTEST
+---
+No se pudo capturar la salida de pytest." > "$SUMMARY_FILE"
+            exit 0
+          fi
+
+          # Extraer linea de resumen final de pytest (ej: "5 passed, 1 failed in 3.21s")
+          RESULT_LINE=$(grep -E "^(FAILED|PASSED|ERROR|=+ [0-9]+ (passed|failed|error))" "$OUTPUT_FILE" | tail -1)
+          if [ -z "$RESULT_LINE" ]; then
+            RESULT_LINE=$(grep -E "[0-9]+ passed" "$OUTPUT_FILE" | tail -1)
+          fi
+
+          # Contar tests por estado
+          PASSED=$(grep -c "^PASSED" "$OUTPUT_FILE" || echo "0")
+          FAILED=$(grep -c "^FAILED" "$OUTPUT_FILE" || echo "0")
+          ERROR_COUNT=$(grep -c "^ERROR" "$OUTPUT_FILE" || echo "0")
+          TOTAL=$((PASSED + FAILED + ERROR_COUNT))
+
+          # Extraer porcentaje de cobertura total
+          COVERAGE=$(grep -E "^TOTAL" "$OUTPUT_FILE" | awk '{print $NF}' | tail -1)
+          if [ -z "$COVERAGE" ]; then
+            COVERAGE="N/D"
+          fi
+
+          # Determinar decision
+          if [ "$FAILED" -gt 0 ] || [ "$ERROR_COUNT" -gt 0 ]; then
+            DECISION="RECHAZADO - Hay pruebas fallidas"
+            QG_STATUS="FALLIDO"
+          else
+            DECISION="APROBADO - Todas las pruebas pasaron"
+            QG_STATUS="APROBADO"
+          fi
+
+          # Extraer nombres de tests fallidos (max 5)
+          FAILED_TESTS=$(grep "^FAILED" "$OUTPUT_FILE" | head -5 | sed 's/^FAILED /  - /' || true)
+          if [ -z "$FAILED_TESTS" ] && [ "$FAILED" -gt 0 ]; then
+            FAILED_TESTS="  - Ver log de Actions para detalles"
+          fi
+
+          {
+            echo "[JOB 3/4] RESUMEN PYTEST"
+            echo "---"
+            echo "Estado general: $QG_STATUS"
+            echo "---"
+            echo "Resultados de pruebas:"
+            echo "Total: $TOTAL"
+            echo "Pasaron: $PASSED"
+            echo "Fallaron: $FAILED"
+            echo "Errores: $ERROR_COUNT"
+            echo "---"
+            echo "Cobertura de codigo: $COVERAGE"
+            echo "---"
+            if [ "$FAILED" -gt 0 ] || [ "$ERROR_COUNT" -gt 0 ]; then
+              echo "Tests fallidos:"
+              echo "$FAILED_TESTS"
+              echo "---"
+            fi
+            echo "Decision: $DECISION"
+          } > "$SUMMARY_FILE"
+
+      # ── ENVIAR RESUMEN PYTEST A TELEGRAM (siempre, antes del PASS/FAIL) ──
+      - name: Enviar resumen Pytest a Telegram
+        if: always()
+        run: |
+          if [ -f pytest_summary.txt ]; then
+            SUMMARY=$(cat pytest_summary.txt)
+          else
+            SUMMARY="[JOB 3/4] RESUMEN PYTEST
+---
+No se pudo generar el resumen del analisis."
+          fi
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            --data-urlencode text="$SUMMARY"
+
       # ── MANEJO DE FALLO EN PRUEBAS ──
       - name: Notificar fallo de pruebas a Telegram
         if: failure()
         run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="❌ [JOB 3/4] ERROR PYTEST: Las pruebas funcionales fallaron en el PR #${{ github.event.pull_request.number }}."
+            -d text="[JOB 3/4] ERROR PYTEST: Las pruebas funcionales fallaron en el PR #${{ github.event.pull_request.number }}."
           gh label create "tests-failed" --color "d73a4a" --description "Pruebas funcionales fallidas" || true
           gh pr edit ${{ github.event.pull_request.number }} --add-label "tests-failed"
 
-      # ── MANEJO DE ÉXITO EN PRUEBAS Y MERGE ──
-      - name: Notificar éxito de pruebas y realizar merge
+      # ── MANEJO DE EXITO EN PRUEBAS Y MERGE ──
+      - name: Notificar exito de pruebas y realizar merge
         if: success()
         run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="✅ [JOB 3/4] PYTEST PASS: Todas las pruebas pasaron para el PR #${{ github.event.pull_request.number }}. Realizando merge en test..."
+            -d text="[JOB 3/4] PYTEST PASS: Todas las pruebas pasaron para el PR #${{ github.event.pull_request.number }}. Realizando merge en test..."
 
-          # Activar auto-merge para fusionar una vez que este check finalice con éxito
+          # Activar auto-merge para fusionar una vez que este check finalice con exito
           gh pr merge ${{ github.event.pull_request.number }} --auto --merge
 
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="🔄 [JOB 3/4] MERGE REALIZADO: PR #${{ github.event.pull_request.number }} fusionado en rama 'test'. Iniciando promoción a main..."
+            -d text="[JOB 3/4] MERGE REALIZADO: PR #${{ github.event.pull_request.number }} fusionado en rama 'test'. Iniciando promocion a main..."
 
   # ==============================================================================
   # JOB 4: PROMOCIÓN A MAIN
