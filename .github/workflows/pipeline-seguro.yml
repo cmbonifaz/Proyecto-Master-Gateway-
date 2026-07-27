@@ -381,25 +381,18 @@ jobs:
           SUMMARY_FILE="pytest_summary.txt"
 
           if [ ! -f "$OUTPUT_FILE" ]; then
-            echo "[JOB 3/4] RESUMEN PYTEST
----
-No se pudo capturar la salida de pytest." > "$SUMMARY_FILE"
+            printf '%s\n' "[JOB 3/4] RESUMEN PYTEST" "---" "No se pudo capturar la salida de pytest." > "$SUMMARY_FILE"
             exit 0
           fi
 
-          # Extraer linea de resumen final de pytest (ej: "5 passed, 1 failed in 3.21s")
-          RESULT_LINE=$(grep -E "^(FAILED|PASSED|ERROR|=+ [0-9]+ (passed|failed|error))" "$OUTPUT_FILE" | tail -1)
-          if [ -z "$RESULT_LINE" ]; then
-            RESULT_LINE=$(grep -E "[0-9]+ passed" "$OUTPUT_FILE" | tail -1)
-          fi
-
           # Contar tests por estado
-          PASSED=$(grep -c "^PASSED" "$OUTPUT_FILE" || echo "0")
-          FAILED=$(grep -c "^FAILED" "$OUTPUT_FILE" || echo "0")
-          ERROR_COUNT=$(grep -c "^ERROR" "$OUTPUT_FILE" || echo "0")
+          PASSED=$(grep -c "^PASSED" "$OUTPUT_FILE" || true)
+          FAILED=$(grep -c "^FAILED" "$OUTPUT_FILE" || true)
+          ERROR_COUNT=$(grep -c "^ERROR " "$OUTPUT_FILE" || true)
+          PASSED=${PASSED:-0}; FAILED=${FAILED:-0}; ERROR_COUNT=${ERROR_COUNT:-0}
           TOTAL=$((PASSED + FAILED + ERROR_COUNT))
 
-          # Extraer porcentaje de cobertura total
+          # Extraer porcentaje de cobertura total (linea TOTAL del reporte de pytest-cov)
           COVERAGE=$(grep -E "^TOTAL" "$OUTPUT_FILE" | awk '{print $NF}' | tail -1)
           if [ -z "$COVERAGE" ]; then
             COVERAGE="N/D"
@@ -416,9 +409,6 @@ No se pudo capturar la salida de pytest." > "$SUMMARY_FILE"
 
           # Extraer nombres de tests fallidos (max 5)
           FAILED_TESTS=$(grep "^FAILED" "$OUTPUT_FILE" | head -5 | sed 's/^FAILED /  - /' || true)
-          if [ -z "$FAILED_TESTS" ] && [ "$FAILED" -gt 0 ]; then
-            FAILED_TESTS="  - Ver log de Actions para detalles"
-          fi
 
           {
             echo "[JOB 3/4] RESUMEN PYTEST"
@@ -448,13 +438,12 @@ No se pudo capturar la salida de pytest." > "$SUMMARY_FILE"
           if [ -f pytest_summary.txt ]; then
             SUMMARY=$(cat pytest_summary.txt)
           else
-            SUMMARY="[JOB 3/4] RESUMEN PYTEST
----
-No se pudo generar el resumen del analisis."
+            SUMMARY=$(printf '%s\n' "[JOB 3/4] RESUMEN PYTEST" "---" "No se pudo generar el resumen del analisis.")
           fi
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
             --data-urlencode text="$SUMMARY"
+
 
       # ── MANEJO DE FALLO EN PRUEBAS ──
       - name: Notificar fallo de pruebas a Telegram
