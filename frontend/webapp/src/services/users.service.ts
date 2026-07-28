@@ -27,5 +27,10 @@ export const UsersService = {
   deleteUser: async (id: string) => {
     const { data } = await apiAuth.delete(`/api/users/${id}`);
     return data;
-  }
+  },
+
+  activateUser: async (id: string) => {
+    const { data } = await apiAuth.patch(`/api/users/${id}/activate`);
+    return data;
+  },
 };

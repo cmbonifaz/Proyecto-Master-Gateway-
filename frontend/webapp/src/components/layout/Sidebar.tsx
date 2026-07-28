@@ -201,32 +201,50 @@ export function Sidebar() {
 
       <nav className="flex-1 overflow-y-auto">
         {isAdmin ? (
-          /* ── Admin: menú de administración fijo ── */
-          <div className="px-3 pt-4 pb-4">
-            <p className="text-[10px] font-semibold text-[var(--color-on-surface-variant)] uppercase tracking-widest mb-2 px-2">
-              Administración
-            </p>
-            <div className="space-y-0.5">
-              {ADMIN_ITEMS.map((item) => {
-                const isActive =
-                  pathname === item.href ||
-                  (pathname.startsWith(item.href) && item.href !== '/dashboard');
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-body-sm transition-all border-l-4 ${
-                      isActive
-                        ? 'bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)] font-semibold border-[var(--color-primary)]'
-                        : 'text-[var(--color-on-surface)] hover:bg-[var(--color-surface-container-low)] border-transparent'
-                    }`}
-                  >
-                    <item.icon size={18} />
-                    {item.name}
-                  </Link>
-                );
-              })}
+          /* ── Admin: sección fija de administración + menús dinámicos del backend ── */
+          <div className="px-3 pt-4 pb-4 space-y-4">
+            {/* Links fijos de administración del Gateway */}
+            <div>
+              <p className="text-[10px] font-semibold text-[var(--color-on-surface-variant)] uppercase tracking-widest mb-2 px-2">
+                Administración
+              </p>
+              <div className="space-y-0.5">
+                {ADMIN_ITEMS.map((item) => {
+                  const isActive =
+                    pathname === item.href ||
+                    (pathname.startsWith(item.href) && item.href !== '/dashboard');
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-body-sm transition-all border-l-4 ${
+                        isActive
+                          ? 'bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)] font-semibold border-[var(--color-primary)]'
+                          : 'text-[var(--color-on-surface)] hover:bg-[var(--color-surface-container-low)] border-transparent'
+                      }`}
+                    >
+                      <item.icon size={18} />
+                      {item.name}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
+
+            {/* Menús dinámicos del rol ADMIN asignados desde el backend */}
+            {!menuLoading && !menuError && dynamicMenus.length > 0 && (
+              <div>
+                <div className="mx-2 mb-2 border-t border-[var(--color-outline-variant)]" />
+                <p className="text-[10px] font-semibold text-[var(--color-on-surface-variant)] uppercase tracking-widest mb-2 px-2">
+                  Menús del rol
+                </p>
+                <div className="space-y-0.5">
+                  {dynamicMenus.map((node) => (
+                    <DynamicMenuNode key={node.id} node={node} depth={0} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : isInsideModule ? (
           /* ── No-Admin dentro de un módulo: menú del módulo ── */
@@ -282,6 +300,7 @@ export function Sidebar() {
           </div>
         )}
       </nav>
+
 
       {/* ── Footer: Usuario + Logout ── */}
       <div className="p-3 border-t border-[var(--color-outline-variant)]">

@@ -8,9 +8,10 @@ import { RolesService, Role } from '@/services/roles.service';
 import { UsersService, User } from '@/services/users.service';
 import { ModulesService, Module } from '@/services/modules.service';
 import { MenusService, Menu } from '@/services/menus.service';
-import { Shield, Plus, Trash2, Settings, Users, Layers, Menu as MenuIcon, X, Check, Filter } from 'lucide-react';
+import { Shield, Plus, Trash2, Settings, Users, Layers, Menu as MenuIcon, X, Check, Filter, Edit } from 'lucide-react';
 import { ALL_ICONS } from '@/components/ui/IconPicker';
 import { AuditDetails } from '@/components/ui/AuditDetails';
+import { handleAxiosError } from '@/lib/utils';
 
 const roleSchema = z.object({
   nombre: z.string().min(3, "Mínimo 3 caracteres").regex(/^[A-Z0-9_]+$/, "Solo mayúsculas, números y guiones bajos"),
@@ -56,6 +57,8 @@ export default function RolesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [permRole, setPermRole] = useState<RoleWithRelations | null>(null);
   const [permTab, setPermTab] = useState<PermTab>('users');
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -69,6 +72,43 @@ export default function RolesPage() {
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<RoleFormValues>({
     resolver: zodResolver(roleSchema),
   });
+
+  const {
+    register: registerEdit,
+    handleSubmit: handleEditSubmit,
+    reset: resetEdit,
+    setValue: setEditValue,
+    formState: { errors: editErrors, isSubmitting: isEditSubmitting },
+  } = useForm<RoleFormValues>({
+    resolver: zodResolver(z.object({
+      nombre: z.string().min(3, 'Mínimo 3 caracteres').regex(/^[A-Z0-9_]+$/, 'Solo mayúsculas, números y guiones bajos'),
+      descripcion: z.string().optional(),
+    })),
+  });
+
+  const openEditModal = (role: Role) => {
+    setEditingRole(role);
+    setEditValue('nombre', role.nombre);
+    setEditValue('descripcion', role.descripcion || '');
+    setError('');
+    setIsEditOpen(true);
+  };
+
+  const onEditSubmit = async (data: RoleFormValues) => {
+    if (!editingRole) return;
+    try {
+      await RolesService.updateRole(editingRole.id, {
+        nombre: data.nombre,
+        descripcion: data.descripcion,
+      });
+      setIsEditOpen(false);
+      resetEdit();
+      setEditingRole(null);
+      fetchRoles();
+    } catch (e: any) {
+      setError(handleAxiosError(e, 'Error actualizando rol'));
+    }
+  };
 
   const fetchRoles = async () => {
     setLoading(true);
@@ -182,7 +222,7 @@ export default function RolesPage() {
       await RolesService.deleteRole(id);
       fetchRoles();
     } catch (e: any) {
-      alert(e.response?.data?.detail || 'Error eliminando rol');
+      alert(handleAxiosError(e, 'Error eliminando rol'));
     }
   };
 
@@ -259,6 +299,13 @@ export default function RolesPage() {
                       <Settings size={18} />
                     </button>
                     <button
+                      onClick={() => openEditModal(role)}
+                      className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-secondary)] hover:bg-[var(--color-secondary-container)] rounded transition-colors inline-flex items-center justify-center"
+                      title="Editar rol"
+                    >
+                      <Edit size={18} />
+                    </button>
+                    <button
                       onClick={() => handleDelete(role.id)}
                       className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-error)] hover:bg-[var(--color-error-container)] rounded transition-colors inline-flex items-center justify-center"
                       title="Eliminar"
@@ -312,6 +359,81 @@ export default function RolesPage() {
                 <button type="submit" disabled={isSubmitting}
                   className="px-4 py-2 bg-[var(--color-primary)] text-white rounded hover:bg-[#0f0f5c] disabled:opacity-50">
                   {isSubmitting ? 'Guardando...' : 'Crear Rol'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Editar Rol ── */}
+      {isEditOpen && editingRole && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-elevation-2 w-full max-w-md border border-[var(--color-outline-variant)]">
+            <div className="px-6 py-4 border-b border-[var(--color-outline-variant)] flex justify-between items-center">
+              <div>
+                <h2 className="text-headline-sm text-[var(--color-on-surface)] flex items-center gap-2">
+                  <Edit size={18} className="text-[var(--color-secondary)]" />
+                  Editar Rol
+                </h2>
+                <p className="text-body-sm text-[var(--color-on-surface-variant)] mt-0.5">
+                  Modificando: <span className="font-semibold text-[var(--color-primary)]">{editingRole.nombre}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => { setIsEditOpen(false); setEditingRole(null); setError(''); }}
+                className="text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)]"
+              >
+                &times;
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit(onEditSubmit)} className="p-6 space-y-4">
+              {error && (
+                <div className="bg-[var(--color-error-container)] text-[var(--color-on-error-container)] p-3 rounded text-body-sm border border-[#ffb4ab] flex justify-between items-center">
+                  <span>{error}</span>
+                  <button type="button" onClick={() => setError('')} className="font-bold ml-2">✕</button>
+                </div>
+              )}
+              <div>
+                <label className="block text-label-md text-[var(--color-on-surface)] mb-1">NOMBRE (MAYÚSCULAS)</label>
+                <input
+                  {...registerEdit('nombre')}
+                  className={`w-full px-3 py-2 border rounded text-body-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                    editErrors.nombre ? 'border-[var(--color-error)]' : 'border-[var(--color-outline-variant)]'
+                  }`}
+                  placeholder="EJ: SUPER_ADMIN"
+                  onChange={(e) => {
+                    e.target.value = e.target.value.toUpperCase().replace(/\s+/g, '_');
+                    registerEdit('nombre').onChange(e);
+                  }}
+                />
+                {editErrors.nombre && (
+                  <p className="text-[var(--color-error)] text-body-sm mt-1">{editErrors.nombre.message}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-label-md text-[var(--color-on-surface)] mb-1">DESCRIPCIÓN (OPCIONAL)</label>
+                <textarea
+                  {...registerEdit('descripcion')}
+                  className="w-full px-3 py-2 border border-[var(--color-outline-variant)] rounded text-body-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  placeholder="Descripción del propósito de este rol"
+                  rows={3}
+                />
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => { setIsEditOpen(false); setEditingRole(null); setError(''); }}
+                  className="px-4 py-2 border border-[var(--color-outline-variant)] text-[var(--color-on-surface)] rounded hover:bg-[var(--color-surface-container-low)]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isEditSubmitting}
+                  className="px-4 py-2 bg-[var(--color-secondary)] text-white rounded hover:bg-[#4a4a8f] disabled:opacity-50"
+                >
+                  {isEditSubmitting ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
               </div>
             </form>
