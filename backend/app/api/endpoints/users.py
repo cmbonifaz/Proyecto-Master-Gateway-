@@ -14,7 +14,7 @@ from app.services.role_service import RoleService
 router = APIRouter()
 
 
-@router.get("/", response_model=List[UserResponse], summary="Listar usuarios activos")
+@router.get("/", response_model=List[UserResponse], summary="Listar usuarios (activos e inactivos)")
 async def list_users(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
@@ -22,7 +22,7 @@ async def list_users(
     limit: int = 100,
 ):
     # Por defecto, cualquier rol autenticado puede listar (se puede restringir a ADMIN)
-    return await UserService.list_active(db, skip=skip, limit=limit)
+    return await UserService.list_all(db, skip=skip, limit=limit)
 
 
 @router.get("/{user_id}", response_model=UserResponse, summary="Obtener usuario por ID")
@@ -31,7 +31,7 @@ async def get_user(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
-    user = await UserService.get_by_id(db, user_id)
+    user = await UserService.get_any_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return user
@@ -64,7 +64,7 @@ async def update_user(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
-    user = await UserService.get_by_id(db, user_id)
+    user = await UserService.get_any_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
@@ -78,7 +78,7 @@ async def delete_user(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db)
 ):
-    user = await UserService.get_by_id(db, user_id)
+    user = await UserService.get_any_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
@@ -88,6 +88,22 @@ async def delete_user(
         
     updater_id = current_user["user"].id
     return await UserService.delete(db, user, updater_id=updater_id)
+
+@router.patch("/{user_id}/activate", response_model=UserResponse, summary="Activar usuario inactivo")
+async def activate_user(
+    user_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db)
+):
+    user = await UserService.get_any_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+    if user.estado == "ACTIVO":
+        raise HTTPException(status_code=400, detail="El usuario ya está activo")
+
+    updater_id = current_user["user"].id
+    return await UserService.activate(db, user, updater_id=updater_id)
 
 
 # ── Asignación de Roles a Usuarios ──────────────────────────────────────────

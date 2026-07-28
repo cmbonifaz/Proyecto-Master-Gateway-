@@ -21,9 +21,13 @@ export const AuthService = {
     return data;
   },
 
+  /**
+   * Validates the current JWT session via the internals endpoint.
+   * The token is sent in the Authorization header by the apiAuth interceptor.
+   * No token is sent in the body to avoid redundancy.
+   */
   validateToken: async () => {
-    const token = localStorage.getItem('access_token');
-    const { data } = await apiAuth.post('/api/internals/validate-token', { token });
+    const { data } = await apiAuth.post('/api/internals/validate-token', {});
     return data;
-  }
+  },
 };

@@ -114,9 +114,14 @@ async def register_user(
     Permite el autorregistro de un usuario nuevo.
     El usuario nace sin roles y requiere que un admin se los asigne después.
     """
-    existing = await UserService.get_by_email(db, obj_in.email)
+    existing = await UserService.get_any_by_email(db, obj_in.email)
     if existing:
-        raise HTTPException(status_code=400, detail="El correo electrónico ya está registrado")
+        if existing.estado == "INACTIVO":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El correo electrónico ya existe en el sistema pero está INACTIVO. Contacte a soporte o use otro."
+            )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El correo electrónico ya está registrado")
     
     await UserService.create(db, obj_in, creator_id=None)
     return {"detail": "Registro exitoso. Espera a que un administrador te asigne un rol."}

@@ -6,8 +6,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { UsersService, User } from '@/services/users.service';
 import { RolesService, Role } from '@/services/roles.service';
-import { Users, Plus, Trash2, Edit, Shield, X, Check } from 'lucide-react';
+import { Users, Plus, Trash2, Edit, Shield, X, Check, CheckCircle } from 'lucide-react';
 import { AuditDetails } from '@/components/ui/AuditDetails';
+import { handleAxiosError } from '@/lib/utils';
 
 const userSchema = z.object({
   id: z.string().optional(),
@@ -48,25 +49,6 @@ const userSchema = z.object({
 
 type UserFormValues = z.infer<typeof userSchema>;
 
-const handleAxiosError = (err: any, defaultMsg: string) => {
-  const detail = err.response?.data?.detail;
-  if (typeof detail === 'string') {
-    return detail;
-  }
-  if (Array.isArray(detail)) {
-    return detail.map((d: any) => d.msg ? d.msg.replace(/^Value error, /, '') : JSON.stringify(d)).join(', ');
-  }
-  if (detail && typeof detail === 'object') {
-    return JSON.stringify(detail);
-  }
-  if (typeof err.response?.data === 'string') {
-    return err.response.data;
-  }
-  if (err.response?.data?.message) {
-    return err.response.data.message;
-  }
-  return err.message || defaultMsg;
-};
 
 function RoleChip({ label, active, onToggle, loading }: { label: string; active: boolean; onToggle: () => void; loading?: boolean }) {
   return (
@@ -95,6 +77,10 @@ export default function UsersPage() {
   const [rolesModal, setRolesModal] = useState<User | null>(null);
   const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [toggling, setToggling] = useState<string | null>(null);
+
+  // Filtros
+  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [filterRole, setFilterRole] = useState('ALL');
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<UserFormValues>({
     resolver: zodResolver(userSchema),
@@ -200,6 +186,16 @@ export default function UsersPage() {
     }
   };
 
+  const handleActivate = async (id: string) => {
+    if (!confirm('¿Estás seguro de volver a activar este usuario?')) return;
+    try {
+      await UsersService.activateUser(id);
+      fetchUsers();
+    } catch (e: any) {
+      alert(handleAxiosError(e, 'Error activando usuario'));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -211,6 +207,34 @@ export default function UsersPage() {
           className="bg-[var(--color-primary)] text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-[#0f0f5c] transition-colors">
           <Plus size={20} /> Nuevo Usuario
         </button>
+      </div>
+
+      <div className="flex items-center gap-4 bg-white p-4 rounded-lg shadow-elevation-1 border border-[var(--color-outline-variant)]">
+        <div className="flex flex-col">
+          <label className="text-label-sm text-[var(--color-on-surface-variant)] mb-1">Estado</label>
+          <select 
+            value={filterStatus} 
+            onChange={e => setFilterStatus(e.target.value)}
+            className="border border-[var(--color-outline-variant)] rounded px-3 py-1.5 text-body-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          >
+            <option value="ALL">Todos</option>
+            <option value="ACTIVO">Activos</option>
+            <option value="INACTIVO">Inactivos</option>
+          </select>
+        </div>
+        <div className="flex flex-col">
+          <label className="text-label-sm text-[var(--color-on-surface-variant)] mb-1">Rol</label>
+          <select 
+            value={filterRole} 
+            onChange={e => setFilterRole(e.target.value)}
+            className="border border-[var(--color-outline-variant)] rounded px-3 py-1.5 text-body-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          >
+            <option value="ALL">Todos los roles</option>
+            {Array.from(new Set(users.flatMap(u => u.roles?.map((r: any) => r.nombre) || []))).map(roleName => (
+              <option key={roleName} value={roleName}>{roleName}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {error && (
@@ -234,10 +258,18 @@ export default function UsersPage() {
           <tbody className="divide-y divide-[var(--color-outline-variant)]">
             {loading ? (
               <tr><td colSpan={5} className="px-6 py-8 text-center text-[var(--color-on-surface-variant)]">Cargando...</td></tr>
-            ) : users.length === 0 ? (
-              <tr><td colSpan={5} className="px-6 py-8 text-center text-[var(--color-on-surface-variant)]">No se encontraron usuarios</td></tr>
-            ) : (
-              users.map(user => (
+            ) : (() => {
+              const filteredUsers = users.filter(u => {
+                const matchStatus = filterStatus === 'ALL' || u.estado === filterStatus;
+                const matchRole = filterRole === 'ALL' || (u.roles && u.roles.some((r: any) => r.nombre === filterRole));
+                return matchStatus && matchRole;
+              });
+
+              if (filteredUsers.length === 0) {
+                return <tr><td colSpan={5} className="px-6 py-8 text-center text-[var(--color-on-surface-variant)]">No se encontraron usuarios con esos filtros</td></tr>;
+              }
+
+              return filteredUsers.map(user => (
                 <tr key={user.id} className="hover:bg-[var(--color-surface-container-lowest)] transition-colors">
                   <td className="px-6 py-4">
                     <div className="text-body-md font-semibold text-[var(--color-primary)]">{user.nombre}</div>
@@ -267,13 +299,19 @@ export default function UsersPage() {
                     <button onClick={() => openEditModal(user)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-container)] rounded transition-colors inline-flex items-center justify-center" title="Editar">
                       <Edit size={18} />
                     </button>
-                    <button onClick={() => handleDelete(user.id)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-error)] hover:bg-[var(--color-error-container)] rounded transition-colors inline-flex items-center justify-center" title="Eliminar/Inactivar">
-                      <Trash2 size={18} />
-                    </button>
+                    {user.estado === 'ACTIVO' ? (
+                      <button onClick={() => handleDelete(user.id)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-error)] hover:bg-[var(--color-error-container)] rounded transition-colors inline-flex items-center justify-center" title="Inactivar usuario">
+                        <Trash2 size={18} />
+                      </button>
+                    ) : (
+                      <button onClick={() => handleActivate(user.id)} className="p-2 text-[var(--color-on-surface-variant)] hover:text-[#115e59] hover:bg-[#ccfbf1] rounded transition-colors inline-flex items-center justify-center" title="Activar usuario">
+                        <CheckCircle size={18} />
+                      </button>
+                    )}
                   </td>
                 </tr>
-              ))
-            )}
+              ));
+            })()}
           </tbody>
         </table>
       </div>
