@@ -219,15 +219,21 @@ jobs:
           Write-Host "Quality Gate: $qgStatus"
 
           # Consultar metricas del proyecto via API de SonarQube
-          $metricsToFetch = "bugs,vulnerabilities,code_smells,coverage,duplicated_lines_density,ncloc,security_rating,reliability_rating,sqale_rating"
+          $metricsToFetch = "bugs,vulnerabilities,code_smells,coverage,new_coverage,duplicated_lines_density,ncloc,security_rating,reliability_rating,sqale_rating"
           $metricsUrl = "$serverUrl/api/measures/component?component=Master-Gateway&metricKeys=$metricsToFetch"
           $metricsResp = Invoke-RestMethod -Uri $metricsUrl -Headers $headers
           $measures = $metricsResp.component.measures
 
-          # Funcion para extraer valor de una metrica
+          # Funcion para extraer valor de una metrica (overall)
           function Get-Measure($name) {
             $m = $measures | Where-Object { $_.metric -eq $name }
             if ($m -and $m.value) { return $m.value } else { return "N/D" }
+          }
+
+          # Funcion para extraer valor de metrica de nuevo codigo (periods[0].value)
+          function Get-NewMeasure($name) {
+            $m = $measures | Where-Object { $_.metric -eq $name }
+            if ($m -and $m.periods -and $m.periods.Count -gt 0) { return $m.periods[0].value } else { return "N/D" }
           }
 
           # Funcion para convertir rating numerico a letra (1=A ... 5=E)
@@ -242,6 +248,7 @@ jobs:
           $vulns       = Get-Measure "vulnerabilities"
           $smells      = Get-Measure "code_smells"
           $coverage    = Get-Measure "coverage"
+          $newCoverage = Get-NewMeasure "new_coverage"
           $duplication = Get-Measure "duplicated_lines_density"
           $ncloc       = Get-Measure "ncloc"
           $secRating   = Rating-Letter (Get-Measure "security_rating")
@@ -251,6 +258,7 @@ jobs:
           $qgLabel  = if ($qgStatus -eq "OK") { "APROBADO" } else { "RECHAZADO ($qgStatus)" }
           $decision = if ($qgStatus -eq "OK") { "APROBADO - Quality Gate superado" } else { "RECHAZADO - Quality Gate no superado" }
           $coverageDisplay    = if ($coverage -ne "N/D") { "$coverage%" } else { "N/D" }
+          $newCoverageDisplay = if ($newCoverage -ne "N/D") { "$newCoverage%" } else { "N/D" }
           $duplicationDisplay = if ($duplication -ne "N/D") { "$duplication%" } else { "N/D" }
 
           $summaryLines = @(
@@ -264,7 +272,8 @@ jobs:
             "Vulnerabilidades: $vulns",
             "Code Smells: $smells",
             "Lineas de codigo: $ncloc",
-            "Cobertura de pruebas: $coverageDisplay",
+            "Cobertura (codigo nuevo): $newCoverageDisplay  <- QG verifica esta",
+            "Cobertura (global): $coverageDisplay",
             "Duplicacion: $duplicationDisplay",
             "---",
             "Ratings de calidad:",
