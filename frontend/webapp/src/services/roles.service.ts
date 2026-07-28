@@ -28,6 +28,11 @@ export const RolesService = {
     return data;
   },
 
+  updateRole: async (id: string, payload: { nombre?: string; descripcion?: string }) => {
+    const { data } = await apiAuth.put(`/api/roles/${id}`, payload);
+    return data;
+  },
+
   deleteRole: async (id: string) => {
     const { data } = await apiAuth.delete(`/api/roles/${id}`);
     return data;

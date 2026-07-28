@@ -23,6 +23,15 @@ class UserService:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_any_by_id(db: AsyncSession, user_id: str) -> Optional[User]:
+        """
+        Busca un usuario por su UUID (activo o inactivo).
+        """
+        stmt = select(User).where(User.id == user_id)
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def get_by_email(db: AsyncSession, email: str) -> Optional[User]:
         """
         Busca un usuario activo por su correo electrónico.
@@ -46,6 +55,15 @@ class UserService:
         Lista usuarios activos paginados.
         """
         stmt = select(User).where(User.estado == "ACTIVO").offset(skip).limit(limit)
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def list_all(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[User]:
+        """
+        Lista todos los usuarios paginados (activos e inactivos).
+        """
+        stmt = select(User).offset(skip).limit(limit)
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
@@ -92,11 +110,25 @@ class UserService:
         return result.scalar_one()
 
     @staticmethod
-    async def delete(db: AsyncSession, db_obj: User, updater_id: Optional[str] = None) -> User:
+    async def delete(db: AsyncSession, user: User, updater_id: Optional[str] = None) -> User:
         """
-        Soft delete: Cambia el estado a INACTIVO.
+        Soft delete: cambia el estado del usuario a INACTIVO.
         """
-        db_obj.soft_delete(updated_by=updater_id)
-        db.add(db_obj)
-        await db.flush()
-        return db_obj
+        user.estado = "INACTIVO"
+        user.actualizado_por = updater_id
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        return user
+
+    @staticmethod
+    async def activate(db: AsyncSession, user: User, updater_id: Optional[str] = None) -> User:
+        """
+        Activa un usuario inactivo.
+        """
+        user.estado = "ACTIVO"
+        user.actualizado_por = updater_id
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        return user
