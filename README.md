@@ -446,30 +446,73 @@ pipeline-seguro/
 
 ## 🛠️ Setup Local
 
+Existen dos maneras de levantar el proyecto en tu entorno local: **Opción 1 con Docker Compose** (recomendado para contar con el ecosistema completo y PostgreSQL en contenedores) o **Opción 2 Manual** (desarrollo rápido con Python y Node.js).
+
 ### Prerrequisitos
 
-- **Python 3.11+**
-- **Node.js 18+** y **npm** (para el Frontend)
-- **Docker Desktop** (opcional, necesario si quieres correr SonarQube localmente)
+- **Docker Desktop** (para la Opción 1 o SonarQube)
+- **Python 3.11+** (para la Opción 2)
+- **Node.js 18+** y **npm** (para la Opción 2)
 - **Git**
 
 ---
 
-### 🚀 Levantando el Backend
+### 🐳 Opción 1: Levantar con Docker Compose (Recomendado)
 
-1. **Clonar el repositorio:**
+Esta opción levanta automáticamente PostgreSQL (`master_db`), la API FastAPI (`master_api`) y el Frontend Next.js (`master_frontend`) en una red compartida.
+
+1. **Configurar el archivo `.env` del Backend:**
+   Copia el archivo `.env.example` dentro de la carpeta `backend/`:
    ```bash
-   git clone https://github.com/<tu-usuario>/pipeline-seguro
-   cd pipeline-seguro
+   cp backend/.env.example backend/.env
+   ```
+   Asegúrate de que en `backend/.env` la conexión apunte a `master_db` (el servicio de PostgreSQL en Docker):
+   ```env
+   DATABASE_URL=postgresql+asyncpg://postgres:postgres@master_db:5432/master
+   JWT_SECRET=tu_secreto_hexadecimal_de_al_menos_32_caracteres
+   DEBUG=True
    ```
 
-2. **Configurar el entorno virtual de Python:**
+2. **Levantar todos los contenedores:**
+   En la raíz del proyecto, ejecuta:
+   ```bash
+   docker compose up --build -d
+   ```
+   *(Nota: `master_api` ejecutará automáticamente las migraciones con Alembic y poblará los datos iniciales de prueba al iniciar).*
+
+3. **Verificar el estado de los servicios:**
+   ```bash
+   docker compose ps
+   ```
+
+4. **(Opcional) Ejecutar o forzar migraciones y seed manualmente si fuese necesario:**
+   ```bash
+   docker compose exec master_api alembic upgrade head
+   docker compose exec master_api python seed_test_data.py
+   ```
+
+5. **URLs y accesos del sistema:**
+   - **Frontend (Next.js):** `http://localhost:3000`
+   - **Backend API (FastAPI):** `http://localhost:8000`
+   - **Documentación Swagger:** `http://localhost:8000/docs`
+
+---
+
+### 💻 Opción 2: Levantamiento Manual (Desarrollo sin Docker)
+
+#### Paso 1: Levantando el Backend (FastAPI)
+
+1. **Ingresar a la carpeta del backend:**
    ```bash
    cd backend
+   ```
+
+2. **Configurar y activar el entorno virtual de Python:**
+   ```bash
    python -m venv .venv
    
    # Activar en Windows (PowerShell):
-   .venv\Scripts\Activate.ps1
+   .\.venv\Scripts\Activate.ps1
    # Activar en Linux/macOS:
    source .venv/bin/activate
    ```
@@ -479,18 +522,17 @@ pipeline-seguro/
    pip install -r requirements.txt
    ```
 
-4. **Configurar Variables de Entorno del Backend:**
-   Copia el archivo `.env.example` como `.env` dentro de la carpeta `backend/`:
+4. **Configurar Variables de Entorno:**
+   Copia `.env.example` a `.env` dentro de `backend/`:
    ```bash
    cp .env.example .env
    ```
-   Abre el archivo `.env` recién creado. Para desarrollo local rápido, puedes configurar SQLite:
+   Para desarrollo local con SQLite en memoria o en archivo local, edita `backend/.env`:
    ```env
    DATABASE_URL=sqlite+aiosqlite:///./master_auth.db
    JWT_SECRET=tu_secreto_hexadecimal_generado_localmente
    DEBUG=True
    ```
-   *(Nota: Para producción, la url apuntará a PostgreSQL/Supabase en formato `postgresql+asyncpg://...`)*
 
 5. **Ejecutar Migraciones de Base de Datos (Alembic):**
    ```bash
@@ -498,7 +540,6 @@ pipeline-seguro/
    ```
 
 6. **Poblar la base de datos con datos semilla de prueba:**
-   Ejecuta el script de semilla para crear los roles (`ADMIN`, `VENDEDOR`), usuarios de prueba (`admin@gateway.com`, `vendedor@gateway.com`), módulos y menús jerárquicos:
    ```bash
    python seed_test_data.py
    ```
@@ -507,12 +548,10 @@ pipeline-seguro/
    ```bash
    uvicorn app.main:app --reload --port 8000
    ```
-   *   **API local en:** `http://localhost:8000`
-   *   **Documentación Interactiva (Swagger UI):** `http://localhost:8000/docs`
+   - **API local en:** `http://localhost:8000`
+   - **Documentación Swagger UI:** `http://localhost:8000/docs`
 
----
-
-### 💻 Levantando el Frontend (Next.js SPA)
+#### Paso 2: Levantando el Frontend (Next.js SPA)
 
 1. **Abrir una nueva terminal e ingresar a la carpeta del frontend:**
    ```bash
@@ -528,10 +567,16 @@ pipeline-seguro/
    ```bash
    npm run dev
    ```
-   *   **Aplicación web disponible en:** `http://localhost:3000`
-   *   **Credenciales de prueba sembradas:**
-       *   **Admin:** `admin@gateway.com` / `Admin123!`
-       *   **Vendedor:** `vendedor@gateway.com` / `Vendedor123!`
+   - **Aplicación web disponible en:** `http://localhost:3000`
+
+---
+
+### 🔑 Credenciales de Prueba Sembradas
+
+- **Admin:** `admin@gateway.com` / `AdminPass123!` (o `Admin123!`)
+- **Vendedor:** `vendedor@gateway.com` / `Vendedor123!`
+- **Bodeguero:** `bodega@gateway.com` / `Bodega123!`
+- **RRHH:** `rrhh@gateway.com` / `RRHH123!`
 
 ---
 
